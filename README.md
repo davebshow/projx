@@ -104,7 +104,7 @@ And we can keep making up examples:
 ***TRANSFER (i)-(p1)***    
 ***TRANSFER (c)-(p2)***    
 ***MERGE (c)-(i)***  
-***PROJECT (p1)-(i)-(p2)  
+***PROJECT (p1)-(i)-(p2)***  
 ...
 
 
