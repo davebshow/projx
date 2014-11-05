@@ -71,7 +71,7 @@ type 'Institution'. First we match the subgraph, and then make
 the projection:
 
 
-'''
+'''      
 ***MATCH (p1:Person)-(i:Institution)-(p2:Person)***  
 ***PROJECT (p1)-(i)-(p2)***  
 '''
@@ -83,7 +83,7 @@ nodes of type 'Person', and then project the same social network of
 'Person' nodes through their association with nodes of type
 'Institution'. The query is as follows:
 
-'''
+'''  
 ***MATCH (c:City)-(p1:Person)-(i:Institution)-(p2:Person)***  
 ***TRANSFER (c)-(p1)***  
 ***PROJECT (p1)-(i)-(p2)***  
@@ -93,11 +93,18 @@ nodes of type 'Person', and then project the same social network of
 
 And we can keep making up examples:
 
-'''
+'''  
 ***MATCH (p1:Person)-(c:City)-(i:Institution)-(p2:Person)***  
 ***MERGE (c)-(i)***   
 ***PROJECT (p1)-(i)-(p2)***  
-'''
+'''  
+
+'''  
+MATCH (p1:Person)-(i:Institution)-(c:City)-(p2:Person)   
+TRANSFER (i)-(p1)  
+TRANSFER (c)-(p2)  
+MERGE (c)-(i)  
+PROJECT (p1)-(i)-(p2)  
 ...
 
 
