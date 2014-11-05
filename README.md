@@ -72,8 +72,8 @@ the projection:
 
 
 '''
-***MATCH (p1:Person)-(i:Institution)-(p2:Person)***
-***PROJECT (p1)-(i)-(p2)***
+***MATCH (p1:Person)-(i:Institution)-(p2:Person)***  
+***PROJECT (p1)-(i)-(p2)***  
 '''
 
 In the above example it is important to note the mandatory use of
@@ -84,9 +84,9 @@ nodes of type 'Person', and then project the same social network of
 'Institution'. The query is as follows:
 
 '''
-***MATCH (c:City)-(p1:Person)-(i:Institution)-(p2:Person)***
-***TRANSFER (c)-(p1)***
-***PROJECT (p1)-(i)-(p2)***
+***MATCH (c:City)-(p1:Person)-(i:Institution)-(p2:Person)***  
+***TRANSFER (c)-(p1)***  
+***PROJECT (p1)-(i)-(p2)***  
 '''
 
 ^ In an undirected graph "TRANSFER (c)-(p1)" finds p2 as well.
@@ -94,9 +94,9 @@ nodes of type 'Person', and then project the same social network of
 And we can keep making up examples:
 
 '''
-***MATCH (p1:Person)-(c:City)-(i:Institution)-(p2:Person)***
-***MERGE (c)-(i)***
-***PROJECT (p1)-(i)-(p2)***
+***MATCH (p1:Person)-(c:City)-(i:Institution)-(p2:Person)***  
+***MERGE (c)-(i)***   
+***PROJECT (p1)-(i)-(p2)***  
 '''
 ...
 
