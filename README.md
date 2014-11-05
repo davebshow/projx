@@ -100,11 +100,11 @@ And we can keep making up examples:
 '''  
 
 '''  
-MATCH (p1:Person)-(i:Institution)-(c:City)-(p2:Person)   
-TRANSFER (i)-(p1)  
-TRANSFER (c)-(p2)  
-MERGE (c)-(i)  
-PROJECT (p1)-(i)-(p2)  
+***MATCH (p1:Person)-(i:Institution)-(c:City)-(p2:Person)***     
+***TRANSFER (i)-(p1)***    
+***TRANSFER (c)-(p2)***    
+***MERGE (c)-(i)***  
+***PROJECT (p1)-(i)-(p2)  
 ...
 
 
