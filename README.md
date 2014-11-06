@@ -53,15 +53,16 @@ does not permit cycles.
 Queries:
 ========
 ProjX queries combine a verb with a pattern to perform some kind
-of search or schema modification over the graph. First there are
-the multi-line queries. They operate over a matched subgraph and
-can perform a sequence of projections. The simplist statments are
-the one line queries. They operate over the entire wrapped graph,
-making one projection at a time.
+of search or schema modification over the graph. If queries begin
+with a "MATCH" clause, they will project across only the matched
+subgraph, thus discarding all nodes that do not match. If queries
+begin with a different clause, they will still only be able to act
+upon the first matched pattern; however, they retain all other nodes
+not involved in the pattern regards of other operations.
 
-Multi-line queries:
+Matched subgraph queries:
 -------------------
-Multi-line queries must begin with a "MATCH" statement. This
+Matched subgraph queries must begin with a "MATCH" statement. This
 produces the subgraph upon which the rest of the verbs will
 operate. After a graph is match, other projections can be perfomed
 upon the resulting subgraph. For example, let's imagine we want to
@@ -112,7 +113,7 @@ CURRENTLY ProjX only allows ***1 match per query***! Also, in
 the future it will probably allow soft pattern matching to match
 partial patterns as well.
 
-One-line queries:
+Full graph queries:
 -----------------
 To perform an projection over the whole graph and return a modified
 copy, simply tell ProjX what you want to do by combining a verb and
@@ -143,6 +144,15 @@ when they are connected through a node of type 'Person':
 ***"TRANSFER (Institution)-(Person)-(City)"***
  
 And we can continue:
+
+
+We can still write multi-line queries that act over the whole graph
+too.
+
+"""  
+TRANSFER (i:Institution)-(p:Person)-(c:City)  
+MERGE (c)-(p)  
+"""
 
 
 ***"MERGE (Foo)-(Bar)"***
