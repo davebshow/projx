@@ -1,7 +1,20 @@
 # -*- coding: utf-8 -*-
-import re
 from itertools import chain
 import networkx as nx
+from grammar import grammar
+
+
+def error_handler(fn):
+    """
+    Wraps the execute method. Will do error handling here.
+    """
+    def wrapper(self, query, **kwargs):
+        try:
+            graph = fn(self, query)
+        except:
+            raise Exception('Check query and graph. An error occurred.')
+        return graph
+    return wrapper
 
 
 class Projection(object):
@@ -17,9 +30,9 @@ class Projection(object):
         of nodes of a designated type to all neighboring nodes of another
         designated type. "TRANSFER" also has a variation "MERGE". "MERGE"
         performs a normal "TRANSFER", but also transfers edges to the transfer
-        target There are two types of queries. The first type are multi-line
-        queries that act upon a pattern matched subgraph
-        of the wrapped graph. The second type consists of one line statements
+        target There are two types of queries. The first type are Matched
+        pattern queries that act upon a pattern matched subgraph
+        of the wrapped graph. The second type consists of statements
         that apply schema modifications across the entire wrapped graph.
         Query language specifications are included in the documentation for
         the execute method
@@ -36,48 +49,50 @@ class Projection(object):
         self.graph = graph
         self.type = type_attr
         self._removals = set()
-        self._grammar = {}
-        # Updates the grammar with the defined rules.
-        self._grammar_rules()
+        self.grammar = grammar
+        self._actions = {}
+        # Updates the actions with the defined rules.
+        self._action_rules()
 
-    def grammar_wrapper(self, verb):
+    def action_wrapper(self, verb):
         """
-        Wraps the grammar rules and adds them to the grammar dictionary for
-        easyretrivial during query parse.
+        Wraps the action methods and adds them to the actions dictionary for
+        easy retrivial during query parse.
 
         :param verb: String. The ProjX verb assiociated with the wrapped
             function.
         """
         def wrapper(fn):
-            self._grammar[verb] = fn
+            self._actions[verb] = fn
         return wrapper
 
-    def _get_grammar(self):
+    def _get_actions(self):
         """
-        Return grammar for grammar property.
+        Return action for actions property.
 
-        :returns: Dict. A dict containing a mapping of grammar verbs to
+        :returns: Dict. A dict containing a mapping of verbs to action
             methods.
         """
-        return self._grammar
-    grammar = property(fget=_get_grammar)
+        return self._actions
+    actions = property(fget=_get_actions)
 
-    def _grammar_rules(self):
+    def _action_rules(self):
         """
-        A series of functions representing the grammar. These are wrapped
-        by the grammar wrapper and added to the grammar. Later during
-        the parsing and execution phase these are called as pointers
-        to the various graph transformation methods (transfer and project).
+        A series of functions representing the grammar actions. These are
+        wrapped by the actions wrapper and added to the actions dict.
+        Later during the parsing and execution phase these are called as
+        pointers to the various graph transformation methods
+        (transfer and project).
         """
-        @self.grammar_wrapper('project')
+        @self.action_wrapper('project')
         def execute_project(graph, paths, match_pattern, pattern):
             return self._project(graph, paths, match_pattern, pattern)
 
-        @self.grammar_wrapper('transfer')
+        @self.action_wrapper('transfer')
         def execute_transfer(graph, paths, match_pattern, pattern):
             return self._transfer(graph, paths, match_pattern, pattern)
 
-        @self.grammar_wrapper('merge')
+        @self.action_wrapper('merge')
         def execute_merge(graph, paths, match_pattern, pattern):
             return self._merge(graph, paths, match_pattern, pattern)
 
@@ -90,6 +105,7 @@ class Projection(object):
         for node in nbunch:
             self.graph.node[node]['visited_from'] = []
 
+    @error_handler
     def execute(self, query):
         """
         This takes a ProjX query and executes it.
@@ -145,15 +161,16 @@ class Projection(object):
         Queries:
         --------
         ProjX queries combine a verb with a pattern to perform some kind
-        of search or schema modification over the graph. First there are
-        the multi-line queries. They operate over a matched subgraph and
-        can perform a sequence of projections. The simplist statments are
-        the one line queries. They operate over the entire wrapped graph,
-        making one projection at a time.
+        of search or schema modification over the graph. If queries begin
+        with a "MATCH" clause, they will project across only the matched
+        subgraph, thus discarding all nodes that do not match. If queries
+        begin with a different clause, they will still only be able to act
+        upon the first matched pattern; however, they retain all other nodes
+        not involved in the pattern regards of other operations.
 
-        Multi-line queries:
+        Matched subgraph queries:
         +++++++++++++++++++
-        Multi-line queries must begin with a "MATCH" statement. This
+        Matched subgraph queries must begin with a "MATCH" statement. This
         produces the subgraph upon which the rest of the verbs will
         operate. After a graph is match, other projections can be perfomed
         upon the resulting subgraph. For example, let's imagine we want to
@@ -194,7 +211,7 @@ class Projection(object):
         the future it will probably allow soft pattern matching to match
         partial patterns as well.
 
-        One-line queries:
+        Full graph queries:
         +++++++++++++++++
         To perform an projection over the whole graph and return a modified
         copy, simply tell ProjX what you want to do by combining a verb and
@@ -215,17 +232,24 @@ class Projection(object):
         Here it is important to remember this projection will delete the
         wildcard nodes, but any other nodes that are not matched by this
         pattern remain in the graph. If you only want the returned graph
-        to contain the 'Person' nodes, you will need to use a Multi-line
-        query as defined in the following section. For a final example, let's
-        "TRANSFER" 'Institution' attributes to nodes of type 'City', but only
-        when they are connected through a node of type 'Person':
+        to contain the 'Person' nodes, you will need to use a matched
+        subgraph queries as defined in the preceding section.
 
-        "TRANSFER (Institution)-(Person)-(City)"
+        We can still write multi-line queries that act over the whole graph
+        too.
+
+        '''
+        TRANSFER (i:Institution)-(p:Person)-(c:City)
+        MERGE (i)-(p)
+        '''
 
         And we can continue:
 
-        "MERGE (Foo)-(Bar)"
+        '''
+        MERGE (Foo)-(Bar)
         ...
+        '''
+
 
         Note that single line queries use the first and last specified
         nodes as the source and target of the operation.
@@ -239,52 +263,29 @@ class Projection(object):
         :returns: networkx.Graph. The graph or subgraph with the required
                   schema modfications.
         """
-        # Parse the query.
-        p = re.compile(r'''
-              MATCH\s+[\(\w:\w\)-]+     # Verb + pattern
-            | TRANSFER\s+[\(\w:\w\)-]+  # Verb + pattern
-            | MERGE\s+[\(\w:\w\)-]+  # Verb + pattern
-            | PROJECT\s+[\(\w:\w\)-]+   # Verb + pattern
-            ''', re.VERBOSE | re.IGNORECASE)
-        statements = p.findall(query)
-        # Find the starting point.
-        if not statements:
-            raise SyntaxError('Invalid query string.')
-        verb, pattern = statements[0].split()
-        verb = verb.lower()
-        mp = _MatchPattern(pattern)
-        if len(statements) == 1:
-            # One-liners - operate on whole graph.
-            paths = self._match(mp)
-            if verb == 'match':
-                graph = self.match(paths)
-            else:
-                graph = self.graph.copy()
-                # Use the grammar to perform the required projection.
-                grammar_fn = self.grammar.get(verb, '')
-                if grammar_fn:
-                    graph, paths = grammar_fn(graph, paths, mp, pattern)
-                else:
-                    raise SyntaxError('Expected statement to begin '
-                                      'with "MATCH" "TRANSFER", '
-                                      'or "PROJECT".')
-        elif len(statements) > 1:
-            # Multi-line queries - store projected changes on subgraph.
-            if verb != 'match':
-                raise SyntaxError('Composed queries must begin '
-                                  'with valid MATCH statment.')
-            paths = self._match(mp)
+        clauses = self.grammar.parseString(query)
+        verb = clauses[0]['verb']
+        pattern = clauses[0]['pattern']
+        mp = _MatchPattern(pattern)  # Fix pattern processor
+        paths = self._match(mp)
+        if verb == 'match':
             graph = self.match(paths)
-            for statement in statements[1:]:
-                verb, pattern = statement.split()
-                grammar_fn = self.grammar.get(verb.lower(), '')
-                if grammar_fn:
-                    graph, paths = grammar_fn(graph, paths, mp, pattern)
-                else:
-                    raise SyntaxError('Expected statement to begin with '
-                                      '"TRANSFER" or "PROJECT".')
+        elif verb in ['transfer', 'merge', 'project']:
+            graph = self.graph.copy()
+            action = self._actions[verb]
+            graph, paths = action(graph, paths, mp, pattern)
         else:
-            raise SyntaxError('Invalid query string.')
+            raise SyntaxError('Expected statement to begin with '
+                              '"TRANSFER" or "PROJECT".')
+        for clause in clauses[1:]:
+            verb = clause['verb']
+            pattern = clause['pattern']
+            action = self.actions.get(verb, '')
+            if action:
+                graph, paths = action(graph, paths, mp, pattern)
+            else:
+                raise SyntaxError('Expected statement to begin with '
+                                  '"TRANSFER" or "PROJECT".')
         graph.remove_nodes_from(self._removals)
         self._removals = set()
         return graph
@@ -580,7 +581,7 @@ def _get_source_target(paths, match_pattern, pattern):
         source = 0
         target = len(paths[0]) - 1
     else:
-        alias_seq = re.findall('\((.*?)\)', pattern)
+        alias_seq = pattern
         try:
             source = match_pattern.alias[alias_seq[0]]
             target = match_pattern.alias[alias_seq[-1]]
@@ -593,10 +594,10 @@ def _get_source_target(paths, match_pattern, pattern):
                 target = match_pattern.alias[alias_seq[-1]]
             except:
                 raise SyntaxError('Patterns should be formatted either '
-                                  '(f:foo)-(b:bar) or (foo)-(bar) '
-                                  'for simple queries with more than 1 '
-                                  'wildcard node use aliases: '
-                                  '"TRANSFER (f:foo)-(wild1:)-(wild2)"')
+                                  '(f:foo)-(b:bar) or (foo)-(bar). '
+                                  'For simple queries with more than 1 type '
+                                  'or wildcard node use aliases: '
+                                  '"TRANSFER (f:foo)-(wild1:)-(wild2:)"')
     return source, target
 
 
@@ -606,14 +607,13 @@ class _MatchPattern(object):
         """
         This is a helper class that takes a match pattern and
         maintains an alias dictionary. This allows for multi-line
-        queries to utilize alaiases.
+        queries to utilize aliases.
 
-        :param :
+        :param pattern: String. A ProjX language pattern.
         """
         self.pattern = pattern  # may not be necessary
         self.alias = {}
         self.type_seq = []
-        pattern = re.findall('\((.*?)\)', pattern)
         for i, group in enumerate(pattern):
             if not group:
                 tp = ''
@@ -627,9 +627,9 @@ class _MatchPattern(object):
                     alias = tp
                 else:
                     raise SyntaxError('Patterns must be formated using '
-                                      'Cypher style notation e.g. '
-                                      'MATCH (Person)-(City) with at '
-                                      'least two types in the sequence.')
+                                      'simple notation e.g. '
+                                      'MATCH (Person)-(City) or Cypher '
+                                      'style: MATCH (p:Person)-(c:City).')
             self.type_seq.append(tp)
             self.alias[alias] = i
 
@@ -657,6 +657,11 @@ def test_graph():
 
 
 def draw_simple(graph):
+    """
+    Utility function to draw a labeled, colored graph with Matplotlib.
+
+    :param graph: networkx.Graph
+    """
     lbls = labels(graph)
     clrs = colors(graph)
     pos = nx.spring_layout(graph)
