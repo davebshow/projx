@@ -9,6 +9,7 @@ verb = (
     CaselessKeyword('PROJECT')
 )
 verb.setParseAction(lambda x: x[0].lower())
+
 # Node type pattern.
 node_open = Suppress(Literal('('))
 node_close = Suppress(Literal(')'))
