@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import chain
 import networkx as nx
-from grammar import grammar
+from grammar import parser
 
 
 def error_handler(fn):
@@ -49,7 +49,7 @@ class Projection(object):
         self.graph = graph
         self.type = type_attr
         self._removals = set()
-        self.grammar = grammar
+        self.parser = parser
         self._actions = {}
         # Updates the actions with the defined rules.
         self._action_rules()
@@ -92,9 +92,9 @@ class Projection(object):
         def execute_transfer(graph, paths, match_pattern, pattern):
             return self._transfer(graph, paths, match_pattern, pattern)
 
-        @self.action_wrapper('merge')
-        def execute_merge(graph, paths, match_pattern, pattern):
-            return self._merge(graph, paths, match_pattern, pattern)
+        @self.action_wrapper('transfer_attrs')
+        def execute_transfer_attrs(graph, paths, match_pattern, pattern):
+            return self._transfer_attrs(graph, paths, match_pattern, pattern)
 
     def _clear(self, nbunch):
         """
@@ -105,7 +105,7 @@ class Projection(object):
         for node in nbunch:
             self.graph.node[node]['visited_from'] = []
 
-    @error_handler
+    #@error_handler
     def execute(self, query):
         """
         This takes a ProjX query and executes it.
@@ -251,9 +251,6 @@ class Projection(object):
         '''
 
 
-        Note that single line queries use the first and last specified
-        nodes as the source and target of the operation.
-
         Predicates:
         -----------
         ProjX doesn't currently support predicates such as "AS", "WHERE",
@@ -263,7 +260,7 @@ class Projection(object):
         :returns: networkx.Graph. The graph or subgraph with the required
                   schema modfications.
         """
-        clauses = self.grammar.parseString(query)
+        clauses = self.parser.parseString(query)
         verb = clauses[0]['verb']
         pattern = clauses[0]['pattern']
         mp = _MatchPattern(pattern)  # Fix pattern processor
@@ -308,6 +305,7 @@ class Projection(object):
         :param pattern: String. A valid pattern string.
         :returns: List of lists. The matched paths.
         """
+
         type_seq = pattern.type_seq
 
         # Get type sequence and start node type.
@@ -388,22 +386,7 @@ class Projection(object):
         graph, paths = self._transfer(self.graph.copy(), paths, match_pattern)
         return graph
 
-    def merge(self, match_pattern):
-        """
-        Performs match, executes _merge, and returns graph. This can be
-        part of programmatic API.
-
-        :param match_pattern: _MatchPattern. The initital pattern specified
-                              in "MATCH" statement or in one-line query.
-        :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
-
-        """
-        paths = self._match(match_pattern)
-        graph, paths = self._project(self.graph.copy(), paths, match_pattern)
-        return graph
-
-    def _merge(self, graph, paths, match_pattern, pattern=None):
+    def _transfer_attrs(self, graph, paths, match_pattern, pattern=None):
         """
         Execute a graph "MERGE" projection.
 
@@ -418,10 +401,10 @@ class Projection(object):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        return self._transfer(graph, paths, match_pattern, pattern, True)
+        return self._transfer(graph, paths, match_pattern, pattern, False)
 
     def _transfer(self, graph, paths, match_pattern,
-                  pattern=None, edges=False):
+                  pattern=None, edges=True):
         """
         Execute a graph "TRANSFER" projection.
 
@@ -514,7 +497,7 @@ class Projection(object):
                     if (current not in attrs['visited_from'] and
                             nbr not in stack and
                             (attrs[self.type] == type_seq[depth] or
-                             type_seq[depth] == '')):
+                             type_seq[depth] == ' ')):
                         self.graph.node[nbr]['visited_from'].append(current)
                         visited.update([nbr])
                         # Continue traversal at next depth.
@@ -570,6 +553,7 @@ def _combine_paths(path):
     return edges
 
 
+# This will be handled by grammar
 def _get_source_target(paths, match_pattern, pattern):
     """
     Uses _MatchPattern's alias system to perform a pattern match.
@@ -614,14 +598,17 @@ class _MatchPattern(object):
         self.pattern = pattern  # may not be necessary
         self.alias = {}
         self.type_seq = []
+        # This will be handled by grammar???
         for i, group in enumerate(pattern):
             if not group:
-                tp = ''
-                alias = ''
+                tp = ' '
+                alias = ' '
             else:
                 group = group.split(':')
                 if len(group) == 2:
                     alias, tp = group
+                    if not tp:
+                        tp = ' '
                 elif len(group) == 1:
                     tp = group[0]
                     alias = tp

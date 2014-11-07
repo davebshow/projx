@@ -1,16 +1,34 @@
-from pyparsing import (Word, alphas, alphanums, OneOrMore,
-                       Group, stringEnd, Suppress, Literal)
-
-
-word = Word(alphas)
-verb = OneOrMore(word)
-verb.setParseAction(lambda x: x[0].lower())
-node = Word(
-    '(' + alphanums + ')',
-    '(' + alphanums + ':' + alphanums + ')'
+from pyparsing import (Word, alphanums, ZeroOrMore, OneOrMore,
+                       Group, stringEnd, Suppress, Literal, Empty,
+                       CaselessKeyword)
+# ProjX verbs.
+verb = (
+    CaselessKeyword('MATCH') |
+    CaselessKeyword('TRANSFER') |
+    CaselessKeyword('TRANSFER_ATTRS') |
+    CaselessKeyword('PROJECT')
 )
-edge = Suppress(Literal('-'))  # Right now these can be suppressed.
-node.setParseAction(lambda x: x[0].lstrip('(').rstrip(')'))
-pattern = node + OneOrMore(edge + node)
-clause = Group(verb.setResultsName('verb') + pattern.setResultsName('pattern'))
-grammar = OneOrMore(clause) + stringEnd
+verb.setParseAction(lambda x: x[0].lower())
+# Node type pattern.
+node_open = Suppress(Literal('('))
+node_close = Suppress(Literal(')'))
+node_content = (
+    Word(alphanums, ':' + alphanums) |
+    Empty().setParseAction(lambda t: ' ')
+)
+node = node_open + node_content + node_close
+
+# Edge patterns.
+edge = Suppress(Literal('-'))  # All edges are undirected, can be suppressed.
+
+# Full pattern.
+pattern = node + ZeroOrMore(edge + node)
+
+# Valid query clause.
+clause = Group(
+    verb.setResultsName('verb') +
+    pattern.setResultsName('pattern')
+)
+
+# Tool for parsing.
+parser = OneOrMore(clause) + stringEnd
