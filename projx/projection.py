@@ -113,22 +113,22 @@ class Projection(object):
 
         Verbs:
         ------
-            - "MATCH" Matches a pattern of nodes based on type.
-            - "MATCH PARTIAL" Like "MATCH", but also matchs a partial pattern.
-                              Coming soon...
-            - "MERGE" Merges the edges and attributes of nodes of one
-                         type across a specified sequence of neighboring nodes
-                         to nodes of another type.
-            - "TRANSFER" Like "MERGE", but only transfers attributes.
-            - "PROJECT" Projects a relationship between nodes of one
-                        type across a specified sequence of neighboring nodes.
-            - "RETURN" Specify table/graph and nodes to return. Coming soon...
+        - "MATCH" Matches a pattern of nodes based on type.
+        - "MATCH PARTIAL" Like "MATCH", but also matchs a partial pattern.
+                Coming soon...
+        - "MERGE" Merges the edges and attributes of nodes of one
+                type across a specified sequence of neighboring nodes
+                to nodes of another type.
+        - "TRANSFER" Like "MERGE", but only transfers attributes.
+        - "PROJECT" Projects a relationship between nodes of one
+                type across a specified sequence of neighboring nodes.
+        - "RETURN" Specify table/graph and nodes to return. Coming soon...
 
         Patterns:
-        ---------
+        =========
 
         Nodes:
-        ++++++
+        ------
         Nodes are represented using (). For the minimal syntax, the
         () contains at least a node type specification, this specification
         corresponds to the attribute set at init type_attr: (Type1).
@@ -140,13 +140,13 @@ class Projection(object):
             - (b:Bar)
 
         Edges:
-        ++++++
+        ------
         Currently, only simple undirected edges are permited. They are
         denoted with the hyphen -. Support for edge types and attrs are
         coming soon.
 
         Patterns:
-        +++++++++
+        ---------
         A pattern is a combination of nodes and edges. It creates a
         "type sequence", or a set of criteria that determain a legal
         path during graph traversal based on node's type_attr. For
@@ -159,7 +159,7 @@ class Projection(object):
             - "(d:Dog)-(p1:Person)-(p2:Person)-(c:Cat)"
 
         Queries:
-        --------
+        ========
         ProjX queries combine a verb with a pattern to perform some kind
         of search or schema modification over the graph. If queries begin
         with a "MATCH" clause, they will project across only the matched
@@ -169,7 +169,7 @@ class Projection(object):
         not involved in the pattern regards of other operations.
 
         Matched subgraph queries:
-        +++++++++++++++++++
+        -------------------------
         Matched subgraph queries must begin with a "MATCH" statement. This
         produces the subgraph upon which the rest of the verbs will
         operate. After a graph is match, other projections can be perfomed
@@ -212,7 +212,7 @@ class Projection(object):
         partial patterns as well.
 
         Full graph queries:
-        +++++++++++++++++
+        -------------------
         To perform an projection over the whole graph and return a modified
         copy, simply tell ProjX what you want to do by combining a verb and
         a simple pattern. Node Type aliases are not necessary for one-line
