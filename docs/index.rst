@@ -33,7 +33,7 @@ but is much simpler, and focuses on matching subgraphs then making transformatio
 	import projx as px	
 	p = px.Projection(g)  # g is an instance of a multi-partite networkx.Graph()
 	subgraph = p.execute('''
-		MATCH   (p1:Person)-(c:City)-(p2:Person)
+		MATCH   (p1:Person)-(c:City)-(p2:Person)  
 		PROJECT (p1)-(c)-(p2)
 	''')
 
