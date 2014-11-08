@@ -102,7 +102,7 @@ class Projection(object):
         for node in nbunch:
             self.graph.node[node]['visited_from'] = []
 
-    #@error_handler
+    @error_handler
     def execute(self, query):
         """
         This takes a ProjX query and executes it.
