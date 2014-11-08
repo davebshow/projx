@@ -85,16 +85,13 @@ class Projection(object):
         (transfer and project).
         """
         @self.action_wrapper('project')
-        def execute_project(graph, paths, match_pattern, pattern):
-            return self._project(graph, paths, match_pattern, pattern)
+        def execute_project(graph, paths, mp, pattern, obj=None):
+            return self._project(graph, paths, mp, pattern, obj)
 
         @self.action_wrapper('transfer')
-        def execute_transfer(graph, paths, match_pattern, pattern):
-            return self._transfer(graph, paths, match_pattern, pattern)
+        def execute_transfer(graph, paths, mp, pattern, obj=None):
+            return self._transfer(graph, paths, mp, pattern, obj)
 
-        @self.action_wrapper('transfer_attrs')
-        def execute_transfer_attrs(graph, paths, match_pattern, pattern):
-            return self._transfer_attrs(graph, paths, match_pattern, pattern)
 
     def _clear(self, nbunch):
         """
@@ -116,13 +113,21 @@ class Projection(object):
         - "MATCH" Matches a pattern of nodes based on type.
         - "MATCH PARTIAL" Like "MATCH", but also matchs a partial pattern.
                 Coming soon...
-        - "MERGE" Merges the edges and attributes of nodes of one
+        - "TRANSFER" Merges the edges and attributes of nodes of one
                 type across a specified sequence of neighboring nodes
                 to nodes of another type.
-        - "TRANSFER" Like "MERGE", but only transfers attributes.
         - "PROJECT" Projects a relationship between nodes of one
                 type across a specified sequence of neighboring nodes.
         - "RETURN" Specify table/graph and nodes to return. Coming soon...
+
+        Objects:
+        --------
+        Objects act as parameters that can be passed to verbs.
+
+        - "ATTRS" When used with "TRANSFER" only attributes will be 
+                transfered.
+        - "EDGES" When used with "TRANSFER" only edges will be 
+                transfered.
 
         Patterns:
         =========
@@ -262,6 +267,7 @@ class Projection(object):
         """
         clauses = self.parser.parseString(query)
         verb = clauses[0]['verb']
+        obj = clauses[0].get('object', '')
         pattern = clauses[0]['pattern']
         mp = _MatchPattern(pattern)  # Fix pattern processor
         paths = self._match(mp)
@@ -270,16 +276,17 @@ class Projection(object):
         elif verb in ['transfer', 'merge', 'project']:
             graph = self.graph.copy()
             action = self._actions[verb]
-            graph, paths = action(graph, paths, mp, pattern)
+            graph, paths = action(graph, paths, mp, pattern, obj=obj)
         else:
             raise SyntaxError('Expected statement to begin with '
                               '"TRANSFER" or "PROJECT".')
         for clause in clauses[1:]:
             verb = clause['verb']
+            obj = clauses[0].get('object', '')
             pattern = clause['pattern']
             action = self.actions.get(verb, '')
             if action:
-                graph, paths = action(graph, paths, mp, pattern)
+                graph, paths = action(graph, paths, mp, pattern, obj=obj)
             else:
                 raise SyntaxError('Expected statement to begin with '
                                   '"TRANSFER" or "PROJECT".')
@@ -335,22 +342,22 @@ class Projection(object):
                             'spelling errors and syntax')
         return paths
 
-    def project(self, match_pattern):
+    def project(self, mp):
         """
         Performs match, executes _project, and returns graph. This can be
         part of programmatic API.
 
-        :param match_pattern: _MatchPattern. The initital pattern specified
+        :param mp: _MatchPattern. The initital pattern specified
                               in "MATCH" statement or in one-line query.
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
 
         """
-        paths = self._match(match_pattern)
-        graph, paths = self._project(self.graph.copy(), paths, match_pattern)
+        paths = self._match(mp)
+        graph, paths = self._project(self.graph.copy(), paths, mp)
         return graph
 
-    def _project(self, graph, paths, match_pattern, pattern=None):
+    def _project(self, graph, paths, mp, pattern=None, obj=None):
         """
         Executes graph "PROJECT" projection.
 
@@ -358,53 +365,35 @@ class Projection(object):
                       subgraph.
         :param path: List of lists. The paths matched
                      by the _match method based.
-        :param match_pattern: _MatchPattern. The initital pattern specified
+        :param mp: _MatchPattern. The initital pattern specified
                               in "MATCH" statement or in one-line query.
         :param pattern: Optional. String. A valid pattern string. Needed for
                         multi-line query.
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        source, target = _get_source_target(paths, match_pattern, pattern)
+        source, target = _get_source_target(paths, mp, pattern)
         for path in paths:
             remove = path[source + 1:target]
             self._removals.update(remove)
             graph.add_edge(path[source], path[target])
         return graph, paths
 
-    def transfer(self, match_pattern):
+    def transfer(self, mp):
         """
         Performs match, executes _transfer, and returns graph. This can be
         part of programmatic API.
 
-        :param match_pattern: _MatchPattern. The initital pattern specified
+        :param mp: _MatchPattern. The initital pattern specified
                               in "MATCH" statement or in one-line query.
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        paths = self._match(match_pattern)
-        graph, paths = self._transfer(self.graph.copy(), paths, match_pattern)
+        paths = self._match(mp)
+        graph, paths = self._transfer(self.graph.copy(), paths, mp)
         return graph
 
-    def _transfer_attrs(self, graph, paths, match_pattern, pattern=None):
-        """
-        Execute a graph "MERGE" projection.
-
-        :param graph: networkx.Graph. A copy of the wrapped grap or its
-                      subgraph.
-        :param path: List of lists. The paths matched
-                     by the _match method based.
-        :param match_pattern: _MatchPattern. The initital pattern specified
-                              in "MATCH" statement or in one-line query.
-        :param pattern: Optional. String. A valid pattern string. Needed for
-                        multi-line query.
-        :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
-        """
-        return self._transfer(graph, paths, match_pattern, pattern, False)
-
-    def _transfer(self, graph, paths, match_pattern,
-                  pattern=None, edges=True):
+    def _transfer(self, graph, paths, mp, pattern=None, edges=True, obj=None):
         """
         Execute a graph "TRANSFER" projection.
 
@@ -412,7 +401,7 @@ class Projection(object):
                       subgraph.
         :param path: List of lists. The paths matched
                      by the _match method based.
-        :param match_pattern: _MatchPattern. The initital pattern specified
+        :param mp: _MatchPattern. The initital pattern specified
                               in "MATCH" statement or in one-line query.
         :param pattern: Optional. String. A valid pattern string. Needed for
                         multi-line query.
@@ -421,7 +410,7 @@ class Projection(object):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        source, target = _get_source_target(paths, match_pattern, pattern)
+        source, target = _get_source_target(paths, mp, pattern)
         for path in paths:
             # Node type to be transfered.
             transfer_source = path[source]
@@ -429,25 +418,26 @@ class Projection(object):
             # node attributes.
             transfer_target = path[target]
             # The difference between MERGE and TRANSFER.
-            if edges:
+            if obj == 'edges' or obj != 'attrs':
                 edges = graph[transfer_source]
                 new_edges = zip([transfer_target] * len(edges), edges)
                 graph.add_edges_from(new_edges)
-            attrs = graph.node[transfer_source]
-            tp = attrs[self.type]
-            # Allow for attributes "slugs" to
-            # be created during transfer for nodes that
-            # take on attributes from multiple transfered nodes.
-            attr_counter = 1
-            # Transfer the attributes to target nodes.
-            for k, v in attrs.items():
-                if k not in [self.type, 'visited_from']:
-                    attname = '{0}_{1}'.format(tp.lower(), k)
-                    if (attname in graph.node[transfer_target] and
-                            graph.node[transfer_target].get(attname, '') != v):
-                        attname = '{0}{1}'.format(attname, attr_counter)
-                        attr_counter += 1
-                    graph.node[transfer_target][attname] = v
+            if obj == 'attrs' or obj != 'edges':
+                attrs = graph.node[transfer_source]
+                tp = attrs[self.type]
+                # Allow for attributes "slugs" to
+                # be created during transfer for nodes that
+                # take on attributes from multiple transfered nodes.
+                attr_counter = 1
+                # Transfer the attributes to target nodes.
+                for k, v in attrs.items():
+                    if k not in [self.type, 'visited_from']:
+                        attname = '{0}_{1}'.format(tp.lower(), k)
+                        if (attname in graph.node[transfer_target] and
+                                graph.node[transfer_target].get(attname, '') != v):
+                            attname = '{0}{1}'.format(attname, attr_counter)
+                            attr_counter += 1
+                        graph.node[transfer_target][attname] = v
             self._removals.update([transfer_source])
         return graph, paths
 
@@ -554,10 +544,10 @@ def _combine_paths(path):
 
 
 # This will be handled by grammar
-def _get_source_target(paths, match_pattern, pattern):
+def _get_source_target(paths, mp, pattern):
     """
     Uses _MatchPattern's alias system to perform a pattern match.
-    :param match_pattern: _MatchPattern. The initital pattern specified
+    :param mp: _MatchPattern. The initital pattern specified
                           in "MATCH" statement or in one-line query.
     :param pattern: String. A valid pattern string of aliases.
     """
@@ -567,15 +557,15 @@ def _get_source_target(paths, match_pattern, pattern):
     else:
         alias_seq = pattern
         try:
-            source = match_pattern.alias[alias_seq[0]]
-            target = match_pattern.alias[alias_seq[-1]]
+            source = mp.alias[alias_seq[0]]
+            target = mp.alias[alias_seq[-1]]
         # This is a hack to deal with syntax evolution
         # alias or not in one-liners.
         except KeyError:
             try:
                 alias_seq = [a.split(':')[0] for a in alias_seq]
-                source = match_pattern.alias[alias_seq[0]]
-                target = match_pattern.alias[alias_seq[-1]]
+                source = mp.alias[alias_seq[0]]
+                target = mp.alias[alias_seq[-1]]
             except:
                 raise SyntaxError('Patterns should be formatted either '
                                   '(f:foo)-(b:bar) or (foo)-(bar). '

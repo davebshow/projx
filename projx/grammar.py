@@ -1,14 +1,17 @@
 from pyparsing import (Word, alphanums, ZeroOrMore, OneOrMore,
                        Group, stringEnd, Suppress, Literal, Empty,
-                       CaselessKeyword)
+                       CaselessKeyword, Optional)
 # ProjX verbs.
 verb = (
     CaselessKeyword('MATCH') |
     CaselessKeyword('TRANSFER') |
-    CaselessKeyword('TRANSFER_ATTRS') |
     CaselessKeyword('PROJECT')
 )
-verb.setParseAction(lambda x: x[0].lower())
+verb.setParseAction(lambda t: t[0].lower())
+
+# Objects of verbs.
+obj = (CaselessKeyword('ATTRS') | CaselessKeyword('EDGES'))
+obj.setParseAction(lambda t: t[0].lower())
 
 # Node type pattern.
 node_open = Suppress(Literal('('))
@@ -27,9 +30,10 @@ pattern = node + ZeroOrMore(edge + node)
 
 # Valid query clause.
 clause = Group(
-    verb.setResultsName('verb') +
+    verb.setResultsName('verb') + 
+    Optional(obj).setResultsName('object') +
     pattern.setResultsName('pattern')
 )
 
-# Tool for parsing.
+# Parser.
 parser = OneOrMore(clause) + stringEnd

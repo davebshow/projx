@@ -5,28 +5,40 @@ ProjX
 ProjX is an implementation of a query/schema manipulation language for NetworkX. It borrows some syntactic conventions from Neo4j Cypher,
 but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types. 
 
-	import projx as px	
-	p = px.Projection(g)  # g is an instance of a multi-partite networkx.Graph()
-	subgraph = p.execute('''
-		MATCH   (p1:Person)-(c:City)-(p2:Person)
-		PROJECT (p1)-(c)-(p2)
-	''')
+    import projx as px  
+    g = nx.test_graph()
+    p = px.Projection(g)  # g is an instance of a multi-partite networkx.Graph()
+    subgraph = p.execute('''
+        MATCH   (p1:Person)-(c:City)-(p2:Person)
+        PROJECT (p1)-(c)-(p2)
+    ''')
 
 The ProjX syntax is as follows:
 -------------------------------
 
+Keywords:
+=========
+
 Verbs:
-======
+------
 - "MATCH" Matches a pattern of nodes based on type.
 - "MATCH PARTIAL" Like "MATCH", but also matchs a partial pattern.
-      	Coming soon...
-- "MERGE" Merges the edges and attributes of nodes of one
-	type across a specified sequence of neighboring nodes
- 	to nodes of another type.
-- "TRANSFER" Like "MERGE", but only transfers attributes.
+        Coming soon...
+- "TRANSFER" Merges the edges and attributes of nodes of one
+    type across a specified sequence of neighboring nodes
+    to nodes of another type.
 - "PROJECT" Projects a relationship between nodes of one
-	type across a specified sequence of neighboring nodes.
+    type across a specified sequence of neighboring nodes.
 - "RETURN" Specify table/graph and nodes to return. Coming soon...
+
+Objects:
+--------
+Objects act as parameters that can be passed to verbs.
+
+- "ATTRS" When used with "TRANSFER" only attributes will be 
+    transfered.
+- "EDGES" When used with "TRANSFER" only edges will be 
+    transfered.
 
 Patterns:
 =========
