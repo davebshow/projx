@@ -1,6 +1,5 @@
-from pyparsing import (Word, alphanums, ZeroOrMore, OneOrMore,
-                       Group, stringEnd, Suppress, Literal, Empty,
-                       CaselessKeyword, Optional)
+from pyparsing import (Word, alphanums, OneOrMore, Group, stringEnd,
+					   Suppress, Literal, Empty, CaselessKeyword, Optional)
 # ProjX verbs.
 verb = (
     CaselessKeyword('MATCH') |
@@ -16,17 +15,21 @@ obj.setParseAction(lambda t: t[0].lower())
 # Node type pattern.
 node_open = Suppress(Literal('('))
 node_close = Suppress(Literal(')'))
-node_content = (
-    Word(alphanums, ':' + alphanums) |
-    Empty().setParseAction(lambda t: ' ')
+seperator = Suppress(Literal(':'))
+alias = Word(alphanums)
+tp = seperator + Word(alphanums)
+node_content = Group(
+	alias.setResultsName('alias') +
+	Optional(tp).setResultsName('type')
 )
+
 node = node_open + node_content + node_close
 
 # Edge patterns.
 edge = Suppress(Literal('-'))  # All edges are undirected, can be suppressed.
 
 # Full pattern.
-pattern = node + ZeroOrMore(edge + node)
+pattern = node + OneOrMore(edge + node)
 
 # Valid query clause.
 clause = Group(

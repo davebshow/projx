@@ -102,7 +102,7 @@ class Projection(object):
         for node in nbunch:
             self.graph.node[node]['visited_from'] = []
 
-    @error_handler
+    #@error_handler
     def execute(self, query):
         """
         This takes a ProjX query and executes it.
@@ -279,7 +279,7 @@ class Projection(object):
             graph, paths = action(graph, paths, mp, pattern, obj=obj)
         else:
             raise SyntaxError('Expected statement to begin with '
-                              '"TRANSFER" or "PROJECT".')
+                              '"MATCH" "TRANSFER" or "PROJECT".')
         for clause in clauses[1:]:
             verb = clause['verb']
             obj = clauses[0].get('object', '')
@@ -312,25 +312,13 @@ class Projection(object):
         :param pattern: String. A valid pattern string.
         :returns: List of lists. The matched paths.
         """
-
         type_seq = pattern.type_seq
-
         # Get type sequence and start node type.
-        if len(type_seq) < 2:
-            raise SyntaxError('Patterns must be formated using '
-                              'Cypher style notation e.g. '
-                              'MATCH (Person)-(City) with at '
-                              'least two types in the sequence.')
         start_type = type_seq[0]
-        if not start_type:
-            raise SyntaxError('Patterns must begin with '
-                              'a specified type e.g., '
-                              'MATCH (Person)-() is valid, '
-                              'MATCH ()-(Person) is not.')
         # Store the results of the upcoming traversals.
         path_list = []
         for node, attrs in self.graph.nodes(data=True):
-            if attrs[self.type] == start_type:
+            if attrs[self.type] == start_type or not start_type:
                 # Traverse the graph using the type sequence
                 # as a criteria for a valid path.
                 paths = self.traverse(node, type_seq[1:])
@@ -487,7 +475,7 @@ class Projection(object):
                     if (current not in attrs['visited_from'] and
                             nbr not in stack and
                             (attrs[self.type] == type_seq[depth] or
-                             type_seq[depth] == ' ')):
+                             type_seq[depth] == '')):
                         self.graph.node[nbr]['visited_from'].append(current)
                         visited.update([nbr])
                         # Continue traversal at next depth.
@@ -543,7 +531,6 @@ def _combine_paths(path):
     return edges
 
 
-# This will be handled by grammar
 def _get_source_target(paths, mp, pattern):
     """
     Uses _MatchPattern's alias system to perform a pattern match.
@@ -551,27 +538,9 @@ def _get_source_target(paths, mp, pattern):
                           in "MATCH" statement or in one-line query.
     :param pattern: String. A valid pattern string of aliases.
     """
-    if pattern is None:
-        source = 0
-        target = len(paths[0]) - 1
-    else:
-        alias_seq = pattern
-        try:
-            source = mp.alias[alias_seq[0]]
-            target = mp.alias[alias_seq[-1]]
-        # This is a hack to deal with syntax evolution
-        # alias or not in one-liners.
-        except KeyError:
-            try:
-                alias_seq = [a.split(':')[0] for a in alias_seq]
-                source = mp.alias[alias_seq[0]]
-                target = mp.alias[alias_seq[-1]]
-            except:
-                raise SyntaxError('Patterns should be formatted either '
-                                  '(f:foo)-(b:bar) or (foo)-(bar). '
-                                  'For simple queries with more than 1 type '
-                                  'or wildcard node use aliases: '
-                                  '"TRANSFER (f:foo)-(wild1:)-(wild2:)"')
+    alias_seq = [p[0] for p in pattern]
+    source = mp.alias[alias_seq[0]]
+    target = mp.alias[alias_seq[-1]]
     return source, target
 
 
@@ -585,30 +554,16 @@ class _MatchPattern(object):
 
         :param pattern: String. A ProjX language pattern.
         """
-        self.pattern = pattern  # may not be necessary
+        self.pattern = pattern
         self.alias = {}
         self.type_seq = []
-        # This will be handled by grammar???
-        for i, group in enumerate(pattern):
-            if not group:
-                tp = ' '
-                alias = ' '
-            else:
-                group = group.split(':')
-                if len(group) == 2:
-                    alias, tp = group
-                    if not tp:
-                        tp = ' '
-                elif len(group) == 1:
-                    tp = group[0]
-                    alias = tp
-                else:
-                    raise SyntaxError('Patterns must be formated using '
-                                      'simple notation e.g. '
-                                      'MATCH (Person)-(City) or Cypher '
-                                      'style: MATCH (p:Person)-(c:City).')
-            self.type_seq.append(tp)
+        for i, node_type in enumerate(pattern):
+            alias = node_type['alias']
             self.alias[alias] = i
+            tp = node_type.get('type', '')
+            if tp:
+                tp = tp[0]
+            self.type_seq.append(tp)
 
 
 def test_graph():
