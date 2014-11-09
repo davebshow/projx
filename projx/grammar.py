@@ -54,7 +54,4 @@ clause = Group(
     pattern.setResultsName('pattern')
 )
 
-# Parse clauses recursively.
-_parser = Forward()
-_parser << clause + ZeroOrMore(_parser)
-parser = _parser + stringEnd
+parser = OneOrMore(clause) + stringEnd
