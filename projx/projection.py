@@ -278,9 +278,6 @@ class Projection(object):
             graph = self.graph.copy()
             action = self._actions[verb]
             graph, paths = action(graph, paths, mp, pattern, obj)
-        else:
-            raise SyntaxError('Expected statement to begin with '
-                              '"MATCH" "TRANSFER" or "PROJECT".')
         for clause in clauses[1:]:
             verb = clause['verb']
             obj = clause.get('object', '')
@@ -288,9 +285,6 @@ class Projection(object):
             action = self.actions.get(verb, '')
             if action:
                 graph, paths = action(graph, paths, mp, pattern, obj)
-            else:
-                raise SyntaxError('Expected statement to begin with '
-                                  '"TRANSFER" or "PROJECT".')
         graph.remove_nodes_from(self._removals)
         self._removals = set()
         return graph
@@ -329,7 +323,7 @@ class Projection(object):
         if not paths:
             raise Exception('There are no nodes matching '
                             'the given type sequence. Check for '
-                            'spelling errors and syntax')
+                            'input errors.')
         return paths
 
     def project(self, mp):
