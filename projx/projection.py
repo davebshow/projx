@@ -54,8 +54,7 @@ class Projection(object):
         self._removals = set()
         self.parser = parser
         self._actions = {}
-        # Updates the actions with the defined rules.
-        self._action_rules()
+        self._action_init()
 
     def action_wrapper(self, verb):
         """
@@ -79,7 +78,7 @@ class Projection(object):
         return self._actions
     actions = property(fget=_get_actions)
 
-    def _action_rules(self):
+    def _action_init(self):
         """
         A series of functions representing the grammar actions. These are
         wrapped by the actions wrapper and added to the actions dict.
@@ -94,7 +93,6 @@ class Projection(object):
         @self.action_wrapper('transfer')
         def execute_transfer(graph, paths, mp, pattern, obj):
             return self._transfer(graph, paths, mp, pattern, obj)
-
 
     def _clear(self, nbunch):
         """
@@ -410,11 +408,11 @@ class Projection(object):
             # node attributes.
             transfer_target = path[target]
             # The difference between MERGE and TRANSFER.
-            if obj == 'edges' or obj != 'attrs':
+            if obj == 'edges' or not obj:
                 edges = graph[transfer_source]
                 new_edges = zip([transfer_target] * len(edges), edges)
                 graph.add_edges_from(new_edges)
-            if obj == 'attrs' or obj != 'edges':
+            if obj == 'attrs' or not obj:
                 attrs = graph.node[transfer_source]
                 tp = attrs[self.node_type]
                 # Allow for attributes "slugs" to
