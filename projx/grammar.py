@@ -1,5 +1,6 @@
-from pyparsing import (Word, alphanums, OneOrMore, Group, stringEnd,
-					   Suppress, Literal, Empty, CaselessKeyword, Optional)
+from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group, 
+                       stringEnd, Suppress, Literal, CaselessKeyword,
+                       Optional, Forward)
 # ProjX verbs.
 verb = (
     CaselessKeyword('MATCH') |
@@ -16,20 +17,35 @@ obj.setParseAction(lambda t: t[0].lower())
 node_open = Suppress(Literal('('))
 node_close = Suppress(Literal(')'))
 seperator = Suppress(Literal(':'))
-alias = Word(alphanums)
-tp = seperator + Word(alphanums)
+node_alias = Word(alphanums, '_' + alphanums)
+node_type = seperator + Word(alphanums, '_' + alphanums)
 node_content = Group(
-	alias.setResultsName('alias') +
-	Optional(tp).setResultsName('type')
+    node_alias.setResultsName('alias') +
+    Optional(node_type).setResultsName('type')
 )
 
 node = node_open + node_content + node_close
 
 # Edge patterns.
-edge = Suppress(Literal('-'))  # All edges are undirected, can be suppressed.
+edge_marker = Suppress(Literal('-'))
+edge_open = Suppress(Literal('['))
+edge_close = Suppress(Literal(']'))
+seperator = Suppress(Literal(':'))
+edge_alias = Word(alphanums, '_' + alphanums)
+edge_type = seperator + Word(alphanums, '_' + alphanums)
+edge_content = edge_open + Group(
+    edge_alias.setResultsName('alias') +
+    Optional(edge_type).setResultsName('type')
+) + edge_close
 
-# Full pattern.
-pattern = node + OneOrMore(edge + node)
+edge = edge_marker + Optional(edge_content + edge_marker)
+
+# Recursive pattern match.
+pattern = Forward() 
+pattern << node.setResultsName('nodes', listAllMatches=True) + ZeroOrMore(
+    edge.setResultsName('edges', listAllMatches=True) + 
+    pattern
+)
 
 # Valid query clause.
 clause = Group(
@@ -38,5 +54,7 @@ clause = Group(
     pattern.setResultsName('pattern')
 )
 
-# Parser.
-parser = OneOrMore(clause) + stringEnd
+# Parse clauses recursively.
+_parser = Forward()
+_parser << clause + ZeroOrMore(_parser)
+parser = _parser + stringEnd

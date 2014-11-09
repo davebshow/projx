@@ -18,7 +18,7 @@ def error_handler(fn):
 
 
 class Projection(object):
-    def __init__(self, graph, type_attr='type'):
+    def __init__(self, graph, node_type_attr='type', edge_type_attr='type'):
         """
         Main class for generating graph projections and schema modifications.
         Wraps a NetworkX graph, and then executes a query written in the
@@ -38,16 +38,19 @@ class Projection(object):
         the execute method
 
         :param graph: An multi-partite (multi-type) instance of
-                      networkx.Graph().
+            networkx.Graph().
 
-        :param type_attr: A string node attribute name that distinguishes
-                          between types (modes). Default is 'type'.
+        :param node_type_attr: A string node attribute name that distinguishes
+            between types (modes). Default is 'type'.
+        :param node_type_attr: A string node attribute name that distinguishes
+            between types (modes). Default is 'type'.
 
         """
         for node in graph.nodes():
             graph.node[node]['visited_from'] = []
         self.graph = graph
-        self.type = type_attr
+        self.node_type = node_type_attr
+        self.edge_type = edge_type_attr
         self._removals = set()
         self.parser = parser
         self._actions = {}
@@ -85,11 +88,11 @@ class Projection(object):
         (transfer and project).
         """
         @self.action_wrapper('project')
-        def execute_project(graph, paths, mp, pattern, obj=None):
+        def execute_project(graph, paths, mp, pattern, obj):
             return self._project(graph, paths, mp, pattern, obj)
 
         @self.action_wrapper('transfer')
-        def execute_transfer(graph, paths, mp, pattern, obj=None):
+        def execute_transfer(graph, paths, mp, pattern, obj):
             return self._transfer(graph, paths, mp, pattern, obj)
 
 
@@ -136,7 +139,7 @@ class Projection(object):
         ------
         Nodes are represented using (). For the minimal syntax, the
         () contains at least a node type specification, this specification
-        corresponds to the attribute set at init type_attr: (Type1).
+        corresponds to the attribute set at init node_type_attr: (Type1).
         For longer queries over subgraphs, it is recommended to
         include an alias with the (): (t1:Type1). This allows for
         cleaner code and prevents errors when using complex pattern
@@ -154,9 +157,9 @@ class Projection(object):
         ---------
         A pattern is a combination of nodes and edges. It creates a
         "type sequence", or a set of criteria that determain a legal
-        path during graph traversal based on node's type_attr. For
-        example, if we want to locate all nodes with type_attr == 'Type1'
-        that are connected to nodes with type_attr == 'Type2', the pattern
+        path during graph traversal based on node's node_type_attr. For
+        example, if we want to locate all nodes with node_type_attr == 'Type1'
+        that are connected to nodes with node_type_attr == 'Type2', the pattern
         would be specified as "(t1:Type1)-(t2:Type2)". A pattern can be as
         long as necessary, and can repeat elements. Note that the traversal
         does not permit cycles.
@@ -264,7 +267,7 @@ class Projection(object):
         :param query: String. A ProjX query.
         :returns: networkx.Graph. The graph or subgraph with the required
                   schema modfications.
-        """
+        """  
         clauses = self.parser.parseString(query)
         verb = clauses[0]['verb']
         obj = clauses[0].get('object', '')
@@ -276,17 +279,17 @@ class Projection(object):
         elif verb in ['transfer', 'merge', 'project']:
             graph = self.graph.copy()
             action = self._actions[verb]
-            graph, paths = action(graph, paths, mp, pattern, obj=obj)
+            graph, paths = action(graph, paths, mp, pattern, obj)
         else:
             raise SyntaxError('Expected statement to begin with '
                               '"MATCH" "TRANSFER" or "PROJECT".')
         for clause in clauses[1:]:
             verb = clause['verb']
-            obj = clauses[0].get('object', '')
+            obj = clause.get('object', '')
             pattern = clause['pattern']
             action = self.actions.get(verb, '')
             if action:
-                graph, paths = action(graph, paths, mp, pattern, obj=obj)
+                graph, paths = action(graph, paths, mp, pattern, obj)
             else:
                 raise SyntaxError('Expected statement to begin with '
                                   '"TRANSFER" or "PROJECT".')
@@ -312,16 +315,17 @@ class Projection(object):
         :param pattern: String. A valid pattern string.
         :returns: List of lists. The matched paths.
         """
-        type_seq = pattern.type_seq
+        node_type_seq = pattern.node_type_seq
+        edge_type_seq = pattern.edge_type_seq
         # Get type sequence and start node type.
-        start_type = type_seq[0]
+        start_type = node_type_seq[0]
         # Store the results of the upcoming traversals.
         path_list = []
         for node, attrs in self.graph.nodes(data=True):
-            if attrs[self.type] == start_type or not start_type:
+            if attrs[self.node_type] == start_type or not start_type:
                 # Traverse the graph using the type sequence
                 # as a criteria for a valid path.
-                paths = self.traverse(node, type_seq[1:])
+                paths = self.traverse(node, node_type_seq[1:], edge_type_seq)
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
         if not paths:
@@ -381,7 +385,7 @@ class Projection(object):
         graph, paths = self._transfer(self.graph.copy(), paths, mp)
         return graph
 
-    def _transfer(self, graph, paths, mp, pattern=None, edges=True, obj=None):
+    def _transfer(self, graph, paths, mp, pattern=None, obj=None):
         """
         Execute a graph "TRANSFER" projection.
 
@@ -412,14 +416,14 @@ class Projection(object):
                 graph.add_edges_from(new_edges)
             if obj == 'attrs' or obj != 'edges':
                 attrs = graph.node[transfer_source]
-                tp = attrs[self.type]
+                tp = attrs[self.node_type]
                 # Allow for attributes "slugs" to
                 # be created during transfer for nodes that
                 # take on attributes from multiple transfered nodes.
                 attr_counter = 1
                 # Transfer the attributes to target nodes.
                 for k, v in attrs.items():
-                    if k not in [self.type, 'visited_from']:
+                    if k not in [self.node_type, 'visited_from']:
                         attname = '{0}_{1}'.format(tp.lower(), k)
                         if (attname in graph.node[transfer_target] and
                                 graph.node[transfer_target].get(attname, '') != v):
@@ -429,7 +433,7 @@ class Projection(object):
             self._removals.update([transfer_source])
         return graph, paths
 
-    def traverse(self, start, type_seq):
+    def traverse(self, start, node_type_seq, edge_type_seq):
         """
         This is a controlled depth, depth first traversal of a NetworkX
         graph and the core of this library. Criteria for searching depends
@@ -459,23 +463,30 @@ class Projection(object):
         # to watch for successful sequence match.
         depth = 0
         # This is the len of a successful sequence.
-        max_depth = len(type_seq)
+        max_depth = len(node_type_seq)
         # When the stack runs out, all candidate
         # nodes have been visited.
         while len(stack) > 0:
             # Traverse!
             if depth < max_depth:
-                nbrs = set(self.graph[current])
+                nbrs = set(self.graph[current]) - set([current])
                 for nbr in nbrs:
+                    edge_type_attr = self.graph[current][nbr].get(
+                        self.edge_type, ''
+                    )
                     attrs = self.graph.node[nbr]
                     # Here check candidate node validity.
                     # Make sure this path hasn't been checked already.
                     # Make sure it matches the type sequence.
                     # Make sure it's not backtracking on same path.
+                    # Kind of a nasty if, but I don't want to 
+                    # make a method call.
                     if (current not in attrs['visited_from'] and
                             nbr not in stack and
-                            (attrs[self.type] == type_seq[depth] or
-                             type_seq[depth] == '')):
+                            (edge_type_attr == edge_type_seq[depth] or
+                             edge_type_seq[depth] == '') and 
+                            (attrs[self.node_type] == node_type_seq[depth] or
+                             node_type_seq[depth] == '')):
                         self.graph.node[nbr]['visited_from'].append(current)
                         visited.update([nbr])
                         # Continue traversal at next depth.
@@ -502,6 +513,8 @@ class Projection(object):
         # for next start node to begin traversal.
         self._clear(visited)
         return paths
+
+
 
     def build_subgraph(self, paths):
         """
@@ -538,9 +551,10 @@ def _get_source_target(paths, mp, pattern):
                           in "MATCH" statement or in one-line query.
     :param pattern: String. A valid pattern string of aliases.
     """
+
     alias_seq = [p[0] for p in pattern]
-    source = mp.alias[alias_seq[0]]
-    target = mp.alias[alias_seq[-1]]
+    source = mp.node_alias[alias_seq[0]]
+    target = mp.node_alias[alias_seq[-1]]
     return source, target
 
 
@@ -555,15 +569,32 @@ class _MatchPattern(object):
         :param pattern: String. A ProjX language pattern.
         """
         self.pattern = pattern
-        self.alias = {}
-        self.type_seq = []
-        for i, node_type in enumerate(pattern):
-            alias = node_type['alias']
-            self.alias[alias] = i
-            tp = node_type.get('type', '')
+        self.nodes = pattern['nodes']
+        self.edges = pattern['edges']
+        self.node_alias = {}
+        self.edge_alias = {}
+        self.node_type_seq = []
+        self.edge_type_seq = []
+        for i, node in enumerate(self.nodes):
+            node = node[0]
+            node_alias = node['alias']
+            self.node_alias[node_alias] = i
+            tp = node.get('type', '')
             if tp:
                 tp = tp[0]
-            self.type_seq.append(tp)
+            self.node_type_seq.append(tp)
+        for j, edge in enumerate(self.edges):
+            if edge:
+                edge = edge[0]
+                edge_alias = edge['alias']
+                self.edge_alias[edge_alias] = i
+                tp = edge.get('type', '')
+                if tp:
+                    tp = tp[0]
+            else:
+                tp = ''
+                self.edge_alias[''] = i
+            self.edge_type_seq.append(tp)
 
 
 def test_graph():
@@ -571,9 +602,24 @@ def test_graph():
     The first tests will use this function I assume.
     :returns: networkx.Graph
     """
-    g = nx.Graph([(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (5, 6),
-                  (7, 3), (8, 5), (7, 2), (8, 4), (7, 4), (9, 4),
-                  (9, 10), (11, 3)])
+    g = nx.Graph([
+        (1, 2, {'type': 'works_at'}),
+        (1, 3, {'type': 'lives_in'}),
+        (2, 3, {'type': 'located_in'}),
+        (3, 4, {'type': 'connected_to'}),
+        (4, 5, {'type': 'connected_to'}),
+        (10, 4, {'type': 'connected_to'}),
+        (5, 6, {'type': 'lives_in'}),
+        (7, 3, {'type': 'lives_in'}),
+        (8, 5, {'type': 'works_at'}),
+        (7, 2, {'type': 'works_at'}),
+        (8, 4, {'type': 'lives_in'}),
+        (7, 4, {'type': 'works_at'}),
+        (9, 4, {'type': 'lives_in'}),
+        (9, 10, {'type': 'works_at'}),
+        (11, 3, {'type': 'lives_in'}),
+        (12, 5, {'type': 'lives_in'})
+    ])
     g.node[1] = {'type': 'Person', 'name': 'davebshow'}
     g.node[2] = {'type': 'Institution', 'name': 'western'}
     g.node[3] = {'type': 'City', 'name': 'london'}
@@ -581,10 +627,12 @@ def test_graph():
     g.node[5] = {'type': 'City', 'name': 'toronto'}
     g.node[6] = {'type': 'Person', 'name': 'gandalf'}
     g.node[7] = {'type': 'Person', 'name': 'versae'}
-    g.node[8] = {'type': 'Person', 'name': 'kreeves'}
+    g.node[8] = {'type': 'Person', 'name': 'neo'}
     g.node[9] = {'type': 'Person', 'name': 'r2d2'}
     g.node[10] = {'type': 'City', 'name': 'alderon'}
     g.node[11] = {'type': 'Person', 'name': 'curly'}
+    g.node[12] = {'type': 'Person', 'name': 'adam'}
+    return g
     return g
 
 
@@ -619,7 +667,22 @@ def labels(graph):
     return labels_dict
 
 
-def colors(graph, type_attr='type'):
+def edge_labels(graph, edge_type_attr='type'):
+    """
+    Utility function that aggreates node attributes as
+    labels for drawing graph in Ipython Notebook.
+
+    :param graph: networkx.Graph
+    :returns: Dict. Nodes as keys, labels as values.
+    """
+    labels_dict = {}
+    for i, j, attrs in graph.edges(data=True):
+        label = attrs[edge_type_attr]
+        labels_dict[(i, j)] = label
+    return labels_dict
+
+
+def colors(graph, node_type_attr='type'):
     """
     Utility function that generates colors for node
     types for drawing graph in Ipython Notebook.
@@ -631,10 +694,10 @@ def colors(graph, type_attr='type'):
     colors = []
     counter = 1
     for node, attrs in graph.nodes(data=True):
-        if attrs[type_attr] not in colors_dict:
-            colors_dict[attrs[type_attr]] = float(counter)
+        if attrs[node_type_attr] not in colors_dict:
+            colors_dict[attrs[node_type_attr]] = float(counter)
             colors.append(float(counter))
             counter += 1
         else:
-            colors.append(colors_dict[attrs[type_attr]])
+            colors.append(colors_dict[attrs[node_type_attr]])
     return colors
