@@ -464,7 +464,8 @@ class Projection(object):
                 nbrs = set(self.graph[current]) - set([current])
                 for nbr in nbrs:
                     edge_type_attr = self.graph[current][nbr].get(
-                        self.edge_type, ''
+                        self.edge_type,
+                        None
                     )
                     attrs = self.graph.node[nbr]
                     # Here check candidate node validity.
