@@ -1,3 +1,1 @@
-v0.1.0, 11/07/2014 -- alpha release.
-
-v0.a1.1, 11/08/2014 -- Removed TRANSFER_ATTRS verb. Now uses objects (args) that are passed to verbs e.g., TRANSFER ATTRS or TRANSFER EDGES
+v0.a1.0, 11/07/2014 -- alpha release.
