@@ -357,10 +357,33 @@ class Projection(object):
                   or its subgraph.
         """
         source, target = _get_source_target(paths, mp, pattern)
+        # Add edges at the end to not mess up the weight calculation.
+        new_edges = []
         for path in paths:
+            source_node = path[source]
+            target_node = path[target]
+            edge_attrs = {}
             remove = path[source + 1:target]
+            if obj != 'edges':
+                # Add removed node attributes to projected edges.
+                for node in remove:
+                    attrs = graph.node[node]
+                    tp = attrs[self.node_type].lower()
+                    for k, v in attrs.items():
+                        if k not in [self.node_type, 'visited_from']:
+                            new_key = '{0}_{1}'.format(tp, k)
+                            edge_attrs[new_key] = v
+            if abs(source - target) == 2:
+                # Calculate Jaccard index for edgeweight
+                snbrs = set(graph[source_node])
+                tnbrs = set(graph[target_node])
+                intersect = snbrs & tnbrs
+                union = snbrs | tnbrs
+                jaccard = float(len(intersect)) / len(union) 
+                edge_attrs['weight'] = jaccard
             self._removals.update(remove)
-            graph.add_edge(path[source], path[target])
+            new_edges.append((source_node, target_node, edge_attrs))
+        graph.add_edges_from(new_edges)
         return graph, paths
 
     def transfer(self, mp):
@@ -625,7 +648,6 @@ def test_graph():
     g.node[10] = {'type': 'City', 'name': 'alderon'}
     g.node[11] = {'type': 'Person', 'name': 'curly'}
     g.node[12] = {'type': 'Person', 'name': 'adam'}
-    return g
     return g
 
 
