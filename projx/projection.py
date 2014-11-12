@@ -542,7 +542,9 @@ class Projection(object):
         g = nx.Graph()
         for path in paths:
             combined_paths = _combine_paths(path)
-            g.add_edges_from(combined_paths)
+            for edges in combined_paths:
+                attrs = self.graph[edges[0]][edges[1]]
+                g.add_edge(edges[0], edges[1], attrs)
         for node in g.nodes():
             g.node[node] = dict(self.graph.node[node])
         return g

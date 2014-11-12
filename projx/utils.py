@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import networkx as nx
 
 
 def test_graph():
@@ -40,20 +40,26 @@ def test_graph():
     return g
 
 
-def draw_simple_graph(graph):
+def draw_simple_graph(graph, node_type_attr='type', 
+                      edge_label_attr='weight', show_edge_labels=True):
     """
     Utility function to draw a labeled, colored graph with Matplotlib.
 
     :param graph: networkx.Graph
     """
     lbls = labels(graph)
-    clrs = colors(graph)
+    clrs = colors(graph, node_type_attr=node_type_attr)
     pos = nx.spring_layout(graph)
+    if show_edge_labels:
+        e_labels = edge_labels(graph, edge_label_attr=edge_label_attr)
+    else:
+        e_labels = {}
     return (nx.draw_networkx(graph, pos=pos, node_color=clrs),
+            nx.draw_networkx_edge_labels(graph, pos=pos, edge_labels=e_labels),
             nx.draw_networkx_labels(graph, pos=pos, labels=lbls))
 
 
-def labels(graph):
+def labels(graph, label_attrs=['label']):
     """
     Utility function that aggreates node attributes as
     labels for drawing graph in Ipython Notebook.
@@ -63,15 +69,18 @@ def labels(graph):
     """
     labels_dict = {}
     for node, attrs in graph.nodes(data=True):
-        label = ''
+        label = u''
         for k, v in attrs.items():
-            if k != 'visited_from':
-                label += '{0}: {1}\n'.format(k, v)
+            if k in label_attrs:
+                try:
+                    label += u'{0}: {1}\n'.format(k, v)
+                except:
+                    label += u'{0}: {1}\n'.format(k, v).encode('utf-8')
         labels_dict[node] = label
     return labels_dict
 
 
-def edge_labels(graph, edge_type_attr='type'):
+def edge_labels(graph, edge_label_attr='weight'):
     """
     Utility function that aggreates node attributes as
     labels for drawing graph in Ipython Notebook.
@@ -81,7 +90,7 @@ def edge_labels(graph, edge_type_attr='type'):
     """
     labels_dict = {}
     for i, j, attrs in graph.edges(data=True):
-        label = attrs[edge_type_attr]
+        label = attrs.get(edge_label_attr, '')
         labels_dict[(i, j)] = label
     return labels_dict
 
@@ -117,7 +126,7 @@ def remove_edges(g, min_weight):
     return g
 
 
-def plot_proj_density(g, start_val, interval, num_proj):
+def proj_density(g, start_val, interval, num_proj):
     dens = []
     cutoffs = []
     for i in range(num_proj):
@@ -125,4 +134,4 @@ def plot_proj_density(g, start_val, interval, num_proj):
         dens.append(nx.density(proj))
         cutoffs.append(start_val)
         start_val += interval
-    return plt.plot(cutoffs, dens)
+    return cutoffs, dens
