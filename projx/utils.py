@@ -1,0 +1,128 @@
+# -*- coding: utf-8 -*-
+
+
+
+def test_graph():
+    """
+    The first tests will use this function I assume.
+    :returns: networkx.Graph
+    """
+    g = nx.Graph([
+        (1, 2, {'type': 'works_at'}),
+        (1, 3, {'type': 'lives_in'}),
+        (2, 3, {'type': 'located_in'}),
+        (3, 4, {'type': 'connected_to'}),
+        (4, 5, {'type': 'connected_to'}),
+        (10, 4, {'type': 'connected_to'}),
+        (5, 6, {'type': 'lives_in'}),
+        (7, 3, {'type': 'lives_in'}),
+        (8, 5, {'type': 'works_at'}),
+        (7, 2, {'type': 'works_at'}),
+        (8, 4, {'type': 'lives_in'}),
+        (7, 4, {'type': 'works_at'}),
+        (9, 4, {'type': 'lives_in'}),
+        (9, 10, {'type': 'works_at'}),
+        (11, 3, {'type': 'lives_in'}),
+        (12, 5, {'type': 'lives_in'})
+    ])
+    g.node[1] = {'type': 'Person', 'name': 'davebshow'}
+    g.node[2] = {'type': 'Institution', 'name': 'western'}
+    g.node[3] = {'type': 'City', 'name': 'london'}
+    g.node[4] = {'type': 'Institution', 'name': 'the matrix'}
+    g.node[5] = {'type': 'City', 'name': 'toronto'}
+    g.node[6] = {'type': 'Person', 'name': 'gandalf'}
+    g.node[7] = {'type': 'Person', 'name': 'versae'}
+    g.node[8] = {'type': 'Person', 'name': 'neo'}
+    g.node[9] = {'type': 'Person', 'name': 'r2d2'}
+    g.node[10] = {'type': 'City', 'name': 'alderon'}
+    g.node[11] = {'type': 'Person', 'name': 'curly'}
+    g.node[12] = {'type': 'Person', 'name': 'adam'}
+    return g
+
+
+def draw_simple_graph(graph):
+    """
+    Utility function to draw a labeled, colored graph with Matplotlib.
+
+    :param graph: networkx.Graph
+    """
+    lbls = labels(graph)
+    clrs = colors(graph)
+    pos = nx.spring_layout(graph)
+    return (nx.draw_networkx(graph, pos=pos, node_color=clrs),
+            nx.draw_networkx_labels(graph, pos=pos, labels=lbls))
+
+
+def labels(graph):
+    """
+    Utility function that aggreates node attributes as
+    labels for drawing graph in Ipython Notebook.
+
+    :param graph: networkx.Graph
+    :returns: Dict. Nodes as keys, labels as values.
+    """
+    labels_dict = {}
+    for node, attrs in graph.nodes(data=True):
+        label = ''
+        for k, v in attrs.items():
+            if k != 'visited_from':
+                label += '{0}: {1}\n'.format(k, v)
+        labels_dict[node] = label
+    return labels_dict
+
+
+def edge_labels(graph, edge_type_attr='type'):
+    """
+    Utility function that aggreates node attributes as
+    labels for drawing graph in Ipython Notebook.
+
+    :param graph: networkx.Graph
+    :returns: Dict. Nodes as keys, labels as values.
+    """
+    labels_dict = {}
+    for i, j, attrs in graph.edges(data=True):
+        label = attrs[edge_type_attr]
+        labels_dict[(i, j)] = label
+    return labels_dict
+
+
+def colors(graph, node_type_attr='type'):
+    """
+    Utility function that generates colors for node
+    types for drawing graph in Ipython Notebook.
+
+    :param graph: networkx.Graph
+    :returns: Dict. Nodes as keys, colors as values.
+    """
+    colors_dict = {}
+    colors = []
+    counter = 1
+    for node, attrs in graph.nodes(data=True):
+        if attrs[node_type_attr] not in colors_dict:
+            colors_dict[attrs[node_type_attr]] = float(counter)
+            colors.append(float(counter))
+            counter += 1
+        else:
+            colors.append(colors_dict[attrs[node_type_attr]])
+    return colors
+
+
+def remove_edges(g, min_weight):
+    for edge in g.edges(data=True):
+        if edge[2]['weight'] < min_weight:
+            g.remove_edge(edge[0], edge[1])
+    for node, deg in g.degree().items():
+        if deg == 0:
+            g.remove_node(node)
+    return g
+
+
+def plot_proj_density(g, start_val, interval, num_proj):
+    dens = []
+    cutoffs = []
+    for i in range(num_proj):
+        proj = remove_edges(g.copy(), start_val)
+        dens.append(nx.density(proj))
+        cutoffs.append(start_val)
+        start_val += interval
+    return plt.plot(cutoffs, dens)
