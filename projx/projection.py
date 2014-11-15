@@ -12,20 +12,20 @@ def error_handler(fn):
         try:
             graph = fn(self, query)
         except:
-            raise Exception('Check query and graph. An error occurred.')
+            raise Exception("Check query and graph. An error occurred.")
         return graph
     return wrapper
 
 
 class Projection(object):
-    def __init__(self, graph, node_type_attr='type', edge_type_attr='type'):
+    def __init__(self, graph, node_type_attr="type", edge_type_attr="type"):
         """
         Main class for generating graph projections and schema modifications.
         Wraps a NetworkX graph, and then executes a query written in the
         ProjX query language over the graph. ProjX queries are based on
-        Neo4j's Cypher syntax, but are currently considerably simpler -
+        Neo4j"s Cypher syntax, but are currently considerably simpler -
         lacking predicates, multiple matches, return statements, ordering etc.
-        However, they do add a few verbs to Cypher's vocabulary, namely:
+        However, they do add a few verbs to Cypher"s vocabulary, namely:
         "TRANSFER" and "PROJECT". "TRANSFER" allows to transfer the attributes
         of nodes of a designated type to all neighboring nodes of another
         designated type. "TRANSFER" also has a variation "MERGE". "MERGE"
@@ -41,13 +41,13 @@ class Projection(object):
             networkx.Graph().
 
         :param node_type_attr: A string node attribute name that distinguishes
-            between types (modes). Default is 'type'.
+            between types (modes). Default is "type".
         :param node_type_attr: A string node attribute name that distinguishes
-            between types (modes). Default is 'type'.
+            between types (modes). Default is "type".
 
         """
         for node in graph.nodes():
-            graph.node[node]['visited_from'] = []
+            graph.node[node]["visited_from"] = []
         self.graph = graph
         self.node_type = node_type_attr
         self.edge_type = edge_type_attr
@@ -86,11 +86,11 @@ class Projection(object):
         pointers to the various graph transformation methods
         (transfer and project).
         """
-        @self.action_wrapper('project')
+        @self.action_wrapper("project")
         def execute_project(graph, paths, mp, pattern, obj):
             return self._project(graph, paths, mp, pattern, obj)
 
-        @self.action_wrapper('transfer')
+        @self.action_wrapper("transfer")
         def execute_transfer(graph, paths, mp, pattern, obj):
             return self._transfer(graph, paths, mp, pattern, obj)
 
@@ -101,11 +101,11 @@ class Projection(object):
         :param nbunch: Iterable. A bunch of nodes.
         """
         for node in nbunch:
-            self.graph.node[node]['visited_from'] = []
+            self.graph.node[node]["visited_from"] = []
 
     #@error_handler
     def execute(self, query):
-        """
+        '''
         This takes a ProjX query and executes it.
         The ProjX syntax is as follows:
 
@@ -155,9 +155,9 @@ class Projection(object):
         ---------
         A pattern is a combination of nodes and edges. It creates a
         "type sequence", or a set of criteria that determain a legal
-        path during graph traversal based on node's node_type_attr. For
-        example, if we want to locate all nodes with node_type_attr == 'Type1'
-        that are connected to nodes with node_type_attr == 'Type2', the pattern
+        path during graph traversal based on node"s node_type_attr. For
+        example, if we want to locate all nodes with node_type_attr == "Type1"
+        that are connected to nodes with node_type_attr == "Type2", the pattern
         would be specified as "(t1:Type1)-(t2:Type2)". A pattern can be as
         long as necessary, and can repeat elements. Note that the traversal
         does not permit cycles.
@@ -179,38 +179,38 @@ class Projection(object):
         Matched subgraph queries must begin with a "MATCH" statement. This
         produces the subgraph upon which the rest of the verbs will
         operate. After a graph is match, other projections can be perfomed
-        upon the resulting subgraph. For example, let's imagine we want to
-        project a For example, let's imagine we want to project a social
-        network of 'Person' nodes through their association with nodes of
-        type 'Institution'. First we match the subgraph, and then make
+        upon the resulting subgraph. For example, let"s imagine we want to
+        project a For example, let"s imagine we want to project a social
+        network of "Person" nodes through their association with nodes of
+        type "Institution". First we match the subgraph, and then make
         the projection:
 
-        '''
+        """
         MATCH (p1:Person)-(i:Institution)-(p2:Person)
         PROJECT (p1)-(i)-(p2)
-        '''
+        """
 
         In the above example it is important to note the mandatory use of
-        the alias style node syntax. To go a step further, let's transfer the
-        edges and atributes contained in nodes of type 'City' to neighboring
-        nodes of type 'Person', and then project the same social network of
-        'Person' nodes through their association with nodes of type
-        'Institution'. The query is as follows:
+        the alias style node syntax. To go a step further, let"s transfer the
+        edges and atributes contained in nodes of type "City" to neighboring
+        nodes of type "Person", and then project the same social network of
+        "Person" nodes through their association with nodes of type
+        "Institution". The query is as follows:
 
-        '''
+        """
         MATCH (c:City)-(p1:Person)-(i:Institution)-(p2:Person)
         TRANSFER (c)-(p1)
         PROJECT (p1)-(i)-(p2)
-        '''
+        """
         ^ In an undirected graph "TRANSFER (c)-(p1)" finds p2 as well.
 
         And we can keep making up examples:
 
-        '''
+        """
         MATCH (p1:Person)-(c:City)-(i:Institution)-(p2:Person)
         MERGE (c)-(i)
         PROJECT (p1)-(i)-(p2)
-        '''
+        """
         ...
 
         CURRENTLY ProjX only allows ***1 match per query***! Also, in
@@ -224,13 +224,13 @@ class Projection(object):
         a simple pattern. Node Type aliases are not necessary for one-line
         queries UNLESS you are using the same node type multiple times in the
         pattern. For example, to transfer all the attributes of nodes of
-        type 'Foo' to their neighboring nodes of type 'Bar' and delete the
-        'Foo' nodes we can say:
+        type "Foo" to their neighboring nodes of type "Bar" and delete the
+        "Foo" nodes we can say:
 
         "TRANSFER (Foo)-(Bar)".
 
         We can also use a wildcard node type when we want a more flexible
-        traversal. Let's project an association graph of people connected
+        traversal. Let"s project an association graph of people connected
         to other people through a node of any other type:
 
         "PROJECT (p1:Person)-()-(p2:Person)".
@@ -238,51 +238,51 @@ class Projection(object):
         Here it is important to remember this projection will delete the
         wildcard nodes, but any other nodes that are not matched by this
         pattern remain in the graph. If you only want the returned graph
-        to contain the 'Person' nodes, you will need to use a matched
+        to contain the "Person" nodes, you will need to use a matched
         subgraph queries as defined in the preceding section.
 
         We can still write multi-line queries that act over the whole graph
         too.
 
-        '''
+        """
         TRANSFER (i:Institution)-(p:Person)-(c:City)
         MERGE (i)-(p)
-        '''
+        """
 
         And we can continue:
 
-        '''
+        """
         MERGE (Foo)-(Bar)
         ...
-        '''
+        """
 
 
         Predicates:
         -----------
-        ProjX doesn't currently support predicates such as "AS", "WHERE",
+        ProjX doesn"t currently support predicates such as "AS", "WHERE",
         but it will soon.
 
         :param query: String. A ProjX query.
         :returns: networkx.Graph. The graph or subgraph with the required
                   schema modfications.
-        """  
+        ''' 
         clauses = self.parser.parseString(query)
-        verb = clauses[0]['verb']
-        obj = clauses[0].get('object', '')
-        pattern = clauses[0]['pattern']
+        verb = clauses[0]["verb"]
+        obj = clauses[0].get("object", "")
+        pattern = clauses[0]["pattern"]
         mp = _MatchPattern(pattern)  # Fix pattern processor
         paths = self._match(mp)
-        if verb == 'match':
+        if verb == "match":
             graph = self.match(paths)
-        elif verb in ['transfer', 'merge', 'project']:
+        elif verb in ["transfer", "merge", "project"]:
             graph = self.graph.copy()
             action = self._actions[verb]
             graph, paths = action(graph, paths, mp, pattern, obj)
         for clause in clauses[1:]:
-            verb = clause['verb']
-            obj = clause.get('object', '')
-            pattern = clause['pattern']
-            action = self.actions.get(verb, '')
+            verb = clause["verb"]
+            obj = clause.get("object", "")
+            pattern = clause["pattern"]
+            action = self.actions.get(verb, "")
             if action:
                 graph, paths = action(graph, paths, mp, pattern, obj)
         graph.remove_nodes_from(self._removals)
@@ -321,9 +321,9 @@ class Projection(object):
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
         if not paths:
-            raise Exception('There are no nodes matching '
-                            'the given type sequence. Check for '
-                            'input errors.')
+            raise Exception("There are no nodes matching "
+                            "the given type sequence. Check for "
+                            "input errors.")
         return paths
 
     def project(self, mp):
@@ -364,14 +364,14 @@ class Projection(object):
             target_node = path[target]
             edge_attrs = {}
             remove = path[source + 1:target]
-            if obj != 'edges':
+            if obj != "edges":
                 # Add removed node attributes to projected edges.
                 for node in remove:
                     attrs = graph.node[node]
                     tp = attrs[self.node_type].lower()
                     for k, v in attrs.items():
-                        if k not in [self.node_type, 'visited_from']:
-                            new_key = '{0}_{1}'.format(tp, k)
+                        if k not in [self.node_type, "visited_from"]:
+                            new_key = "{0}_{1}".format(tp, k)
                             edge_attrs[new_key] = v
             if abs(source - target) == 2:
                 # Calculate Jaccard index for edgeweight
@@ -380,7 +380,7 @@ class Projection(object):
                 intersect = snbrs & tnbrs
                 union = snbrs | tnbrs
                 jaccard = float(len(intersect)) / len(union) 
-                edge_attrs['weight'] = jaccard
+                edge_attrs["weight"] = jaccard
             self._removals.update(remove)
             new_edges.append((source_node, target_node, edge_attrs))
         graph.add_edges_from(new_edges)
@@ -425,11 +425,11 @@ class Projection(object):
             # node attributes.
             transfer_target = path[target]
             # The difference between MERGE and TRANSFER.
-            if obj == 'edges' or not obj:
+            if obj == "edges" or not obj:
                 edges = graph[transfer_source]
                 new_edges = zip([transfer_target] * len(edges), edges)
                 graph.add_edges_from(new_edges)
-            if obj == 'attrs' or not obj:
+            if obj == "attrs" or not obj:
                 attrs = graph.node[transfer_source]
                 tp = attrs[self.node_type]
                 # Allow for attributes "slugs" to
@@ -438,11 +438,11 @@ class Projection(object):
                 attr_counter = 1
                 # Transfer the attributes to target nodes.
                 for k, v in attrs.items():
-                    if k not in [self.node_type, 'visited_from']:
-                        attname = '{0}_{1}'.format(tp.lower(), k)
+                    if k not in [self.node_type, "visited_from"]:
+                        attname = "{0}_{1}".format(tp.lower(), k)
                         if (attname in graph.node[transfer_target] and
-                                graph.node[transfer_target].get(attname, '') != v):
-                            attname = '{0}{1}'.format(attname, attr_counter)
+                                graph.node[transfer_target].get(attname, "") != v):
+                            attname = "{0}{1}".format(attname, attr_counter)
                             attr_counter += 1
                         graph.node[transfer_target][attname] = v
             self._removals.update([transfer_source])
@@ -492,18 +492,18 @@ class Projection(object):
                     )
                     attrs = self.graph.node[nbr]
                     # Here check candidate node validity.
-                    # Make sure this path hasn't been checked already.
+                    # Make sure this path hasn"t been checked already.
                     # Make sure it matches the type sequence.
-                    # Make sure it's not backtracking on same path.
-                    # Kind of a nasty if, but I don't want to 
+                    # Make sure it"s not backtracking on same path.
+                    # Kind of a nasty if, but I don"t want to 
                     # make a method call.
-                    if (current not in attrs['visited_from'] and
+                    if (current not in attrs["visited_from"] and
                             nbr not in stack and
                             (edge_type_attr == edge_type_seq[depth] or
-                             edge_type_seq[depth] == '') and 
+                             edge_type_seq[depth] == "") and 
                             (attrs[self.node_type] == node_type_seq[depth] or
-                             node_type_seq[depth] == '')):
-                        self.graph.node[nbr]['visited_from'].append(current)
+                             node_type_seq[depth] == "")):
+                        self.graph.node[nbr]["visited_from"].append(current)
                         visited.update([nbr])
                         # Continue traversal at next depth.
                         current = nbr
@@ -564,7 +564,7 @@ def _combine_paths(path):
 
 def _get_source_target(paths, mp, pattern):
     """
-    Uses _MatchPattern's alias system to perform a pattern match.
+    Uses _MatchPattern"s alias system to perform a pattern match.
     :param mp: _MatchPattern. The initital pattern specified
                           in "MATCH" statement or in one-line query.
     :param pattern: String. A valid pattern string of aliases.
@@ -587,29 +587,29 @@ class _MatchPattern(object):
         :param pattern: String. A ProjX language pattern.
         """
         self.pattern = pattern
-        self.nodes = pattern['nodes']
-        self.edges = pattern['edges']
+        self.nodes = pattern["nodes"]
+        self.edges = pattern["edges"]
         self.node_alias = {}
         self.edge_alias = {}
         self.node_type_seq = []
         self.edge_type_seq = []
         for i, node in enumerate(self.nodes):
             node = node[0]
-            node_alias = node['alias']
+            node_alias = node["alias"]
             self.node_alias[node_alias] = i
-            tp = node.get('type', '')
+            tp = node.get("type", "")
             if tp:
                 tp = tp[0]
             self.node_type_seq.append(tp)
         for j, edge in enumerate(self.edges):
             if edge:
                 edge = edge[0]
-                edge_alias = edge['alias']
+                edge_alias = edge["alias"]
                 self.edge_alias[edge_alias] = i
-                tp = edge.get('type', '')
+                tp = edge.get("type", "")
                 if tp:
                     tp = tp[0]
             else:
-                tp = ''
-                self.edge_alias[''] = i
+                tp = ""
+                self.edge_alias[""] = i
             self.edge_type_seq.append(tp)
