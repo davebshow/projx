@@ -360,7 +360,10 @@ class Projection(object):
         for path in paths:
             source_node = path[source]
             target_node = path[target]
-            remove = path[source + 1:target]
+            if source < target:
+                remove = path[source + 1:target]
+            else:
+                remove = path[target + 1:source]
             new_attrs = {}
             if to_set:
                 new_attrs = _transfer_attrs(new_attrs, to_set, mp,
