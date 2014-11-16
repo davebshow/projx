@@ -41,13 +41,14 @@ def test_graph():
 
 
 def draw_simple_graph(graph, node_type_attr='type', 
-                      edge_label_attr='weight', show_edge_labels=True):
+                      edge_label_attr='weight', show_edge_labels=True,
+                      label_attrs=['name']):
     """
     Utility function to draw a labeled, colored graph with Matplotlib.
 
     :param graph: networkx.Graph
     """
-    lbls = labels(graph)
+    lbls = labels(graph, label_attrs=label_attrs)
     clrs = colors(graph, node_type_attr=node_type_attr)
     pos = nx.spring_layout(graph)
     if show_edge_labels:
@@ -59,7 +60,7 @@ def draw_simple_graph(graph, node_type_attr='type',
             nx.draw_networkx_labels(graph, pos=pos, labels=lbls))
 
 
-def labels(graph, label_attrs=['label']):
+def labels(graph, label_attrs=['name']):
     """
     Utility function that aggreates node attributes as
     labels for drawing graph in Ipython Notebook.

@@ -53,44 +53,44 @@ class Projection(object):
         self.edge_type = edge_type_attr
         self._removals = set()
         self.parser = parser
-        self._actions = {}
-        self._action_init()
+        self._operations = {}
+        self._operations_init()
 
-    def action_wrapper(self, verb):
+    def operations_wrapper(self, verb):
         """
-        Wraps the action methods and adds them to the actions dictionary for
+        Wraps the operations methods and adds them to the operationss dictionary for
         easy retrivial during query parse.
 
         :param verb: String. The ProjX verb assiociated with the wrapped
             function.
         """
         def wrapper(fn):
-            self._actions[verb] = fn
+            self._operations[verb] = fn
         return wrapper
 
-    def _get_actions(self):
+    def _get_operations(self):
         """
-        Return action for actions property.
+        Return operations for operationss property.
 
-        :returns: Dict. A dict containing a mapping of verbs to action
+        :returns: Dict. A dict containing a mapping of verbs to operations
             methods.
         """
-        return self._actions
-    actions = property(fget=_get_actions)
+        return self._operations
+    operations = property(fget=_get_operations)
 
-    def _action_init(self):
+    def _operations_init(self):
         """
-        A series of functions representing the grammar actions. These are
-        wrapped by the actions wrapper and added to the actions dict.
+        A series of functions representing the grammar operationss. These are
+        wrapped by the operationss wrapper and added to the operationss dict.
         Later during the parsing and execution phase these are called as
         pointers to the various graph transformation methods
         (transfer and project).
         """
-        @self.action_wrapper("project")
+        @self.operations_wrapper("project")
         def execute_project(graph, paths, mp, pattern, obj, pred_clause):
             return self._project(graph, paths, mp, pattern, obj, pred_clause)
 
-        @self.action_wrapper("transfer")
+        @self.operations_wrapper("transfer")
         def execute_transfer(graph, paths, mp, pattern, obj, pred_clause):
             return self._transfer(graph, paths, mp, pattern, obj, pred_clause)
 
@@ -280,9 +280,9 @@ class Projection(object):
             obj = clause.get("object", "")
             pattern = clause["pattern"]
             pred_clause = clause.get("predicates", "")
-            action = self.actions[verb]    
-            graph, paths = action(graph, paths, mp, pattern,
-                                  obj, pred_clause)
+            operation = self.operations[verb]    
+            graph, paths = operation(graph, paths, mp, pattern,
+                                     obj, pred_clause)
         return graph
 
     def match(self, paths):
@@ -357,6 +357,8 @@ class Projection(object):
                   or its subgraph.
         """
         removals = set()
+        to_set = ''
+        method = ''
         if pred_clause:
             to_set, delete, method = _process_predicate(pred_clause, mp)   
         source, target = _get_source_target(paths, mp, pattern)
@@ -365,15 +367,11 @@ class Projection(object):
             source_node = path[source]
             target_node = path[target]
             remove = path[source + 1:target]
-            attrs = {}
+            new_attrs = {}
             if to_set:
-                for att in to_set:
-                    i = mp.node_alias[att['type2']]
-                    node = path[i]
-                    a = graph.node[node][att['attr2']]
-                    attrs.setdefault(att['attr1'], [])
-                    attrs[att['attr1']].append(a)
-            if ((method == 'jaccard' or not method) and 
+                new_attrs = _transfer_attrs(new_attrs, to_set, mp,
+                                            path, graph, self.node_type)
+            if ((method == "jaccard" or not method) and 
                 abs(source - target) == 2):
                 # Calculate Jaccard index for edgeweightself.
                 snbrs = set(graph[source_node])
@@ -381,12 +379,31 @@ class Projection(object):
                 intersect = snbrs & tnbrs
                 union = snbrs | tnbrs
                 jaccard = float(len(intersect)) / len(union) 
-                attrs["weight"] = jaccard
+                new_attrs["weight"] = jaccard
             removals.update(remove)
-            new_edges.append((source_node, target_node, attrs))
-        graph.add_edges_from(new_edges)
+            new_edges.append((source_node, target_node, new_attrs))
+        graph = self.add_edges_from(graph, new_edges)
         graph.remove_nodes_from(removals)
         return graph, paths
+
+    def add_edges_from(self, graph, new_edges):
+        reserved = ['weight', self.edge_type]
+        for source, target, attrs in new_edges:
+            if graph.has_edge(source, target):
+                edge_attrs = graph[source][target]
+                for k, v in attrs.items():
+                    if k in reserved:
+                        edge_attrs[k] = v
+                    elif k not in edge_attrs:
+                        edge_attrs[k] = set([v])
+                    else:
+                        val = edge_attrs[k]
+                        if not isinstance(val, set):
+                            edge_attrs[k] = set([val])
+                        edge_attrs[k].update(v)
+            else:
+                graph.add_edge(source, target, attrs)
+        return graph
 
     def transfer(self, mp):
         """
@@ -419,6 +436,8 @@ class Projection(object):
                   or its subgraph.
         """
         removals = set()
+        delete = []
+        to_set = ''
         if pred_clause:
             to_set, delete, method = _process_predicate(pred_clause, mp)
         source, target = _get_source_target(paths, mp, pattern)
@@ -429,20 +448,18 @@ class Projection(object):
             # node attributes.
             transfer_target = path[target]
             # The difference between MERGE and TRANSFER.
-            for i in delete:
-                removals.update([path[i]])
+            if delete:
+                for i in delete:
+                    removals.update([path[i]])
             if obj == "edges" or not obj:
                 edges = graph[transfer_source]
                 new_edges = zip([transfer_target] * len(edges), edges)
                 graph.add_edges_from(new_edges)
             if (obj == "attrs" or not obj) and to_set:
                 attrs = graph.node[transfer_target]
-                for att in to_set:
-                    i = mp.node_alias[att['type2']]
-                    node = path[i]
-                    a = graph.node[node][att['attr2']]
-                    attrs.setdefault(att['attr1'], [])
-                    attrs[att['attr1']].append(a)
+                new_attrs = _transfer_attrs(attrs, to_set, mp, path, 
+                                            graph, self.node_type)
+                graph.node[transfer_target] = new_attrs
         graph.remove_nodes_from(removals)
         return graph, paths
 
@@ -556,6 +573,28 @@ def _combine_paths(path):
     for i, node in enumerate(path[1:]):
         edges.append((path[i], node))
     return edges
+
+
+def _transfer_attrs(attrs, to_set, mp, path, graph, node_type):
+    new_attrs = dict(attrs)
+    for att in to_set:
+        attr1 = att['attr1']
+        if att.get('type2', ''):
+            i = mp.node_alias[att['type2']]
+            node = path[i]
+            a = graph.node[node][att['attr2']]
+        else:
+            a = att['attr2']
+        if attr1 == node_type:
+            new_attrs[node_type] = a 
+        elif attr1 in new_attrs:
+            val = new_attrs[attr1]
+            if not isinstance(val, set):
+                new_attrs[attrs1] = set([val])
+            new_attrs[attr1].update([a])
+        else:
+            new_attrs[attr1] = set([a])  
+    return new_attrs
 
 
 def _process_predicate(pred_clause, mp):
