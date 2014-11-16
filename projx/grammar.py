@@ -27,46 +27,7 @@ obj = (
     CaselessKeyword("SUBGRAPH") |
     CaselessKeyword("TABLE")
 )
-
 obj.setParseAction(lambda t: t[0].lower())
-
-
-################### PREDICATE CLAUSES #######################
-# Predicates
-pred = (
-    CaselessKeyword("DELETE") |
-    CaselessKeyword("METHOD") |
-    CaselessKeyword("WHERE") |
-    CaselessKeyword("SET")
-)
-pred.setParseAction(lambda t: t[0].lower())
-
-# Used for the creation of new nodes with combine.
-new = CaselessKeyword("NEW")
-new.setParseAction(lambda t: t[0].lower())
-
-# Right part of getter setter.
-right = (
-    var.setResultsName("type2") + dot_op + var.setResultsName("attr2") |
-    quotedString.setResultsName("attr2")
-)
-
-# This can be used with both SET and WHERE. 
-gettr_settr = Group(
-    var.setResultsName("type1") +
-    dot_op +
-    var.setResultsName("attr1") +
-    Literal("=") +
-    right
-)
-
-# Recursive definition for multiple predicate objects.
-attr = gettr_settr | var
-pred_obj = Forward()
-pred_obj << attr.setResultsName("pred_objects", listAllMatches=True) + ZeroOrMore(
-    Suppress(Literal(",")) +
-    pred_obj
-) 
 
 
 ################ NODE AND EDGE PATTERNS ###################
@@ -98,9 +59,54 @@ edge = edge_marker + Optional(edge_content + edge_marker)
 # Recursive pattern match.
 pattern = Forward() 
 pattern << node.setResultsName("nodes", listAllMatches=True) + ZeroOrMore(
-    edge.setResultsName("edges", listAllMatches=True) + 
-    pattern
+    edge.setResultsName("edges", listAllMatches=True) + pattern
 )
+
+
+################### PREDICATE CLAUSES #######################
+# Predicates
+pred = (
+    CaselessKeyword("DELETE") |
+    CaselessKeyword("METHOD") |
+    CaselessKeyword("WHERE") |
+    CaselessKeyword("SET")
+)
+pred.setParseAction(lambda t: t[0].lower())
+
+# Used for the creation of new nodes with combine or project.
+new = Literal("NEW")
+new.setParseAction(lambda t: t[0].lower())
+
+# Right part of getter setter.
+right = (
+    var.setResultsName("type2") + dot_op + var.setResultsName("attr2") |
+    quotedString.setResultsName("attr2")
+)
+
+left = new | var 
+# This can be used with both SET and WHERE. 
+gettr_settr = Group(
+    left.setResultsName("type1") +
+    dot_op +
+    var.setResultsName("attr1") +
+    Literal("=") +
+    right
+)
+
+# Recursive definition for multiple predicate objects.
+attr = gettr_settr | var
+pred_obj = Forward()
+pred_obj << attr.setResultsName("pred_objects", listAllMatches=True) + ZeroOrMore(
+    Suppress(Literal(",")) + pred_obj
+)
+ 
+# Allow multiple predicate clauses.
+pred_clause = ZeroOrMore(
+    Group(
+        pred.setResultsName("predicate") +
+        pred_obj
+    ).setResultsName("pred_clauses", listAllMatches=True)
+).setResultsName("predicates", listAllMatches=True)
 
 
 ###################### QUERY ###########################
@@ -109,8 +115,7 @@ clause = Group(
     verb.setResultsName("verb") + 
     Optional(obj).setResultsName("object") +
     pattern.setResultsName("pattern") +
-    Optional(pred.setResultsName("predicate") +
-             pred_obj.setResultsName("pred_obj")).setResultsName("predicate")
+    pred_clause
 )
 
 parser = OneOrMore(clause) + stringEnd

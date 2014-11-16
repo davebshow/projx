@@ -87,12 +87,12 @@ class Projection(object):
         (transfer and project).
         """
         @self.action_wrapper("project")
-        def execute_project(graph, paths, mp, pattern, obj):
-            return self._project(graph, paths, mp, pattern, obj)
+        def execute_project(graph, paths, mp, pattern, obj, pred_clause):
+            return self._project(graph, paths, mp, pattern, obj, pred_clause)
 
         @self.action_wrapper("transfer")
-        def execute_transfer(graph, paths, mp, pattern, obj):
-            return self._transfer(graph, paths, mp, pattern, obj)
+        def execute_transfer(graph, paths, mp, pattern, obj, pred_clause):
+            return self._transfer(graph, paths, mp, pattern, obj, pred_clause)
 
     def _clear(self, nbunch):
         """
@@ -267,53 +267,52 @@ class Projection(object):
                   schema modfications.
         ''' 
         clauses = self.parser.parseString(query)
-        verb = clauses[0]["verb"]
-        obj = clauses[0].get("object", "")
-        pattern = clauses[0]["pattern"]
-        mp = _MatchPattern(pattern)  # Fix pattern processor
-        paths = self._match(mp)
-        if verb == "match":
-            graph = self.match(paths)
-        elif verb in ["transfer", "merge", "project"]:
-            graph = self.graph.copy()
-            action = self._actions[verb]
-            graph, paths = action(graph, paths, mp, pattern, obj)
+        match = clauses[0]
+        # verb = match["verb"] This will be validated in grammar.
+        obj = match.get("object", "")
+        pattern = match["pattern"]
+        pred_clause = match.get("predicates", "")
+        mp = _MatchPattern(pattern)  # Fix pattern processor    
+        graph, paths = self._match(mp, obj=obj, pred_clause=pred_clause)
         for clause in clauses[1:]:
             verb = clause["verb"]
+            # Here I can check for match to create second subgraph
             obj = clause.get("object", "")
             pattern = clause["pattern"]
-            action = self.actions.get(verb, "")
-            if action:
-                graph, paths = action(graph, paths, mp, pattern, obj)
-        graph.remove_nodes_from(self._removals)
-        self._removals = set()
+            pred_clause = clause.get("predicates", "")
+            action = self.actions[verb]    
+            graph, paths = action(graph, paths, mp, pattern,
+                                  obj, pred_clause)
         return graph
 
     def match(self, paths):
         """
-        Converts _match output to a networkx.Graph.
+        Will form part of programmatic api.
 
         :param path: List of lists. The paths matched
                      by the _match method.
         :returns: networkx.Graph. A matched subgraph.
         """
         # Return a graph comprised by the matched nodes.
-        return self.build_subgraph(paths)
+        pass
 
-    def _match(self, pattern):
+    def _match(self, mp, graph=None, obj=None, pred_clause=None):
         """
         Executes traversals to perform initial match on pattern.
 
         :param pattern: String. A valid pattern string.
         :returns: List of lists. The matched paths.
         """
-        node_type_seq = pattern.node_type_seq
-        edge_type_seq = pattern.edge_type_seq
+
+        if not graph:
+            graph = self.graph.copy()
+        node_type_seq = mp.node_type_seq
+        edge_type_seq = mp.edge_type_seq
         # Get type sequence and start node type.
         start_type = node_type_seq[0]
         # Store the results of the upcoming traversals.
         path_list = []
-        for node, attrs in self.graph.nodes(data=True):
+        for node, attrs in graph.nodes(data=True):
             if attrs[self.node_type] == start_type or not start_type:
                 # Traverse the graph using the type sequence
                 # as a criteria for a valid path.
@@ -324,7 +323,9 @@ class Projection(object):
             raise Exception("There are no nodes matching "
                             "the given type sequence. Check for "
                             "input errors.")
-        return paths
+        if obj != 'graph':
+            graph = self.build_subgraph(paths)
+        return graph, paths
 
     def project(self, mp):
         """
@@ -337,11 +338,10 @@ class Projection(object):
                   or its subgraph.
 
         """
-        paths = self._match(mp)
-        graph, paths = self._project(self.graph.copy(), paths, mp)
-        return graph
+        pass
 
-    def _project(self, graph, paths, mp, pattern=None, obj=None):
+    def _project(self, graph, paths, mp, 
+                 pattern, obj=None, pred_clause=None):
         """
         Executes graph "PROJECT" projection.
 
@@ -356,34 +356,36 @@ class Projection(object):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
+        removals = set()
+        if pred_clause:
+            to_set, delete, method = _process_predicate(pred_clause, mp)   
         source, target = _get_source_target(paths, mp, pattern)
-        # Add edges at the end to not mess up the weight calculation.
         new_edges = []
         for path in paths:
             source_node = path[source]
             target_node = path[target]
-            edge_attrs = {}
             remove = path[source + 1:target]
-            if obj != "edges":
-                # Add removed node attributes to projected edges.
-                for node in remove:
-                    attrs = graph.node[node]
-                    tp = attrs[self.node_type].lower()
-                    for k, v in attrs.items():
-                        if k not in [self.node_type, "visited_from"]:
-                            new_key = "{0}_{1}".format(tp, k)
-                            edge_attrs[new_key] = v
-            if abs(source - target) == 2:
-                # Calculate Jaccard index for edgeweight
+            attrs = {}
+            if to_set:
+                for att in to_set:
+                    i = mp.node_alias[att['type2']]
+                    node = path[i]
+                    a = graph.node[node][att['attr2']]
+                    attrs.setdefault(att['attr1'], [])
+                    attrs[att['attr1']].append(a)
+            if ((method == 'jaccard' or not method) and 
+                abs(source - target) == 2):
+                # Calculate Jaccard index for edgeweightself.
                 snbrs = set(graph[source_node])
                 tnbrs = set(graph[target_node])
                 intersect = snbrs & tnbrs
                 union = snbrs | tnbrs
                 jaccard = float(len(intersect)) / len(union) 
-                edge_attrs["weight"] = jaccard
-            self._removals.update(remove)
-            new_edges.append((source_node, target_node, edge_attrs))
+                attrs["weight"] = jaccard
+            removals.update(remove)
+            new_edges.append((source_node, target_node, attrs))
         graph.add_edges_from(new_edges)
+        graph.remove_nodes_from(removals)
         return graph, paths
 
     def transfer(self, mp):
@@ -396,11 +398,10 @@ class Projection(object):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        paths = self._match(mp)
-        graph, paths = self._transfer(self.graph.copy(), paths, mp)
-        return graph
+        pass
 
-    def _transfer(self, graph, paths, mp, pattern=None, obj=None):
+    def _transfer(self, graph, paths, mp, 
+                  pattern, obj=None, pred_clause=None):
         """
         Execute a graph "TRANSFER" projection.
 
@@ -417,6 +418,9 @@ class Projection(object):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
+        removals = set()
+        if pred_clause:
+            to_set, delete, method = _process_predicate(pred_clause, mp)
         source, target = _get_source_target(paths, mp, pattern)
         for path in paths:
             # Node type to be transfered.
@@ -425,27 +429,21 @@ class Projection(object):
             # node attributes.
             transfer_target = path[target]
             # The difference between MERGE and TRANSFER.
+            for i in delete:
+                removals.update([path[i]])
             if obj == "edges" or not obj:
                 edges = graph[transfer_source]
                 new_edges = zip([transfer_target] * len(edges), edges)
                 graph.add_edges_from(new_edges)
-            if obj == "attrs" or not obj:
-                attrs = graph.node[transfer_source]
-                tp = attrs[self.node_type]
-                # Allow for attributes "slugs" to
-                # be created during transfer for nodes that
-                # take on attributes from multiple transfered nodes.
-                attr_counter = 1
-                # Transfer the attributes to target nodes.
-                for k, v in attrs.items():
-                    if k not in [self.node_type, "visited_from"]:
-                        attname = "{0}_{1}".format(tp.lower(), k)
-                        if (attname in graph.node[transfer_target] and
-                                graph.node[transfer_target].get(attname, "") != v):
-                            attname = "{0}{1}".format(attname, attr_counter)
-                            attr_counter += 1
-                        graph.node[transfer_target][attname] = v
-            self._removals.update([transfer_source])
+            if (obj == "attrs" or not obj) and to_set:
+                attrs = graph.node[transfer_target]
+                for att in to_set:
+                    i = mp.node_alias[att['type2']]
+                    node = path[i]
+                    a = graph.node[node][att['attr2']]
+                    attrs.setdefault(att['attr1'], [])
+                    attrs[att['attr1']].append(a)
+        graph.remove_nodes_from(removals)
         return graph, paths
 
     def traverse(self, start, node_type_seq, edge_type_seq):
@@ -530,8 +528,6 @@ class Projection(object):
         self._clear(visited)
         return paths
 
-
-
     def build_subgraph(self, paths):
         """
         Takes the paths returned by _match and builds a graph.
@@ -560,6 +556,25 @@ def _combine_paths(path):
     for i, node in enumerate(path[1:]):
         edges.append((path[i], node))
     return edges
+
+
+def _process_predicate(pred_clause, mp):
+    to_set = []
+    delete = []
+    method = ''
+    # This is a bit ugly.    
+    preds = pred_clause[0]['pred_clauses']
+    for pred in preds:
+        p = pred['predicate']
+        if p == 'set':
+            to_set = pred['pred_objects']
+        elif p == 'delete':
+            delete = [
+                mp.node_alias[p] for p in pred['pred_objects']
+            ]
+        elif p == 'method':
+            method = pred['pred_objects'][0]
+    return to_set, delete, method
 
 
 def _get_source_target(paths, mp, pattern):
