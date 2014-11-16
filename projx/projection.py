@@ -268,7 +268,6 @@ class Projection(object):
         ''' 
         clauses = self.parser.parseString(query)
         match = clauses[0]
-        # verb = match["verb"] This will be validated in grammar.
         obj = match.get("object", "")
         pattern = match["pattern"]
         pred_clause = match.get("predicates", "")
@@ -276,7 +275,7 @@ class Projection(object):
         graph, paths = self._match(mp, obj=obj, pred_clause=pred_clause)
         for clause in clauses[1:]:
             verb = clause["verb"]
-            # Here I can check for match to create second subgraph
+            # Here I can check for match to create second subgraph.
             obj = clause.get("object", "")
             pattern = clause["pattern"]
             pred_clause = clause.get("predicates", "")
@@ -293,7 +292,6 @@ class Projection(object):
                      by the _match method.
         :returns: networkx.Graph. A matched subgraph.
         """
-        # Return a graph comprised by the matched nodes.
         pass
 
     def _match(self, mp, graph=None, obj=None, pred_clause=None):
@@ -308,14 +306,10 @@ class Projection(object):
             graph = self.graph.copy()
         node_type_seq = mp.node_type_seq
         edge_type_seq = mp.edge_type_seq
-        # Get type sequence and start node type.
         start_type = node_type_seq[0]
-        # Store the results of the upcoming traversals.
         path_list = []
         for node, attrs in graph.nodes(data=True):
             if attrs[self.node_type] == start_type or not start_type:
-                # Traverse the graph using the type sequence
-                # as a criteria for a valid path.
                 paths = self.traverse(node, node_type_seq[1:], edge_type_seq)
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
@@ -373,7 +367,7 @@ class Projection(object):
                                             path, graph, self.node_type)
             if ((method == "jaccard" or not method) and 
                 abs(source - target) == 2):
-                # Calculate Jaccard index for edgeweightself.
+                # Calculate Jaccard index for edge weight.
                 snbrs = set(graph[source_node])
                 tnbrs = set(graph[target_node])
                 intersect = snbrs & tnbrs
@@ -385,25 +379,6 @@ class Projection(object):
         graph = self.add_edges_from(graph, new_edges)
         graph.remove_nodes_from(removals)
         return graph, paths
-
-    def add_edges_from(self, graph, new_edges):
-        reserved = ['weight', self.edge_type]
-        for source, target, attrs in new_edges:
-            if graph.has_edge(source, target):
-                edge_attrs = graph[source][target]
-                for k, v in attrs.items():
-                    if k in reserved:
-                        edge_attrs[k] = v
-                    elif k not in edge_attrs:
-                        edge_attrs[k] = set([v])
-                    else:
-                        val = edge_attrs[k]
-                        if not isinstance(val, set):
-                            edge_attrs[k] = set([val])
-                        edge_attrs[k].update(v)
-            else:
-                graph.add_edge(source, target, attrs)
-        return graph
 
     def transfer(self, mp):
         """
@@ -442,19 +417,20 @@ class Projection(object):
             to_set, delete, method = _process_predicate(pred_clause, mp)
         source, target = _get_source_target(paths, mp, pattern)
         for path in paths:
-            # Node type to be transfered.
             transfer_source = path[source]
-            # Node type to recieve transfered
-            # node attributes.
             transfer_target = path[target]
-            # The difference between MERGE and TRANSFER.
             if delete:
                 for i in delete:
                     removals.update([path[i]])
             if obj == "edges" or not obj:
                 edges = graph[transfer_source]
-                new_edges = zip([transfer_target] * len(edges), edges)
-                graph.add_edges_from(new_edges)
+                # This is naive.
+                new_edges = zip(
+                    [transfer_target] * len(edges),
+                    edges,
+                    [v for (k, v) in edges.items()]
+                )
+                graph = self.add_edges_from(graph, new_edges)
             if (obj == "attrs" or not obj) and to_set:
                 attrs = graph.node[transfer_target]
                 new_attrs = _transfer_attrs(attrs, to_set, mp, path, 
@@ -545,6 +521,25 @@ class Projection(object):
         self._clear(visited)
         return paths
 
+    def add_edges_from(self, graph, new_edges):
+        reserved = ['weight', self.edge_type]
+        for source, target, attrs in new_edges:
+            if graph.has_edge(source, target):
+                edge_attrs = graph[source][target]
+                for k, v in attrs.items():
+                    if k in reserved:
+                        edge_attrs[k] = v
+                    elif k not in edge_attrs:
+                        edge_attrs[k] = set([v])
+                    else:
+                        val = edge_attrs[k]
+                        if not isinstance(val, set):
+                            edge_attrs[k] = set([val])
+                        edge_attrs[k].update(v)
+            else:
+                graph.add_edge(source, target, attrs)
+        return graph
+
     def build_subgraph(self, paths):
         """
         Takes the paths returned by _match and builds a graph.
@@ -579,12 +574,13 @@ def _transfer_attrs(attrs, to_set, mp, path, graph, node_type):
     new_attrs = dict(attrs)
     for att in to_set:
         attr1 = att['attr1']
+        attr2 = att['attr2']
         if att.get('type2', ''):
             i = mp.node_alias[att['type2']]
             node = path[i]
-            a = graph.node[node][att['attr2']]
+            a = graph.node[node][attr2]
         else:
-            a = att['attr2']
+            a = attr2
         if attr1 == node_type:
             new_attrs[node_type] = a 
         elif attr1 in new_attrs:
@@ -623,7 +619,6 @@ def _get_source_target(paths, mp, pattern):
                           in "MATCH" statement or in one-line query.
     :param pattern: String. A valid pattern string of aliases.
     """
-
     alias_seq = [p[0] for p in pattern]
     source = mp.node_alias[alias_seq[0]]
     target = mp.node_alias[alias_seq[-1]]
