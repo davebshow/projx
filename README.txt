@@ -2,16 +2,11 @@
 ProjX
 =====
 
-ProjX is an implementation of a query/schema manipulation language for NetworkX. It borrows some syntactic conventions from Neo4j Cypher,
-but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types. 
+**PRE-Alpha Version API breaking changes will occur regularly over the next several months.**
 
-    import projx as px  
-    g = nx.test_graph()
-    p = px.Projection(g)  # g is an instance of a multi-partite networkx.Graph()
-    subgraph = p.execute('''
-        MATCH   (p1:Person)-(c:City)-(p2:Person)
-        PROJECT (p1)-(c)-(p2)
-    ''')
+ProjX is an implementation of a query/schema manipulation language for NetworkX. It borrows some syntactic conventions from Neo4j Cypher,
+but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types:
+
 
 The ProjX syntax is as follows:
 -------------------------------
@@ -52,8 +47,8 @@ For longer queries over subgraphs, it is recommended to
 include an alias with the (): (t1:Type1). This allows for
 cleaner code and prevents errors when using complex pattern
 that repeat types.
-    - (f:Foo)
-    - (b:Bar)
+- (f:Foo)
+- (b:Bar)
 
 Edges:
 ------
@@ -71,8 +66,8 @@ that are connected to nodes with type_attr == 'Type2', the pattern
 would be specified as "(t1:Type1)-(t2:Type2)". A pattern can be as
 long as necessary, and can repeat elements. Note that the traversal
 does not permit cycles.
-    - "(f1:Foo)-(b:Bar)-(f2:Foo)"
-    - "(d:Dog)-(p1:Person)-(p2:Person)-(c:Cat)"
+- "(f1:Foo)-(b:Bar)-(f2:Foo)"
+- "(d:Dog)-(p1:Person)-(p2:Person)-(c:Cat)"
 
 Queries:
 ========
@@ -85,7 +80,7 @@ upon the first matched pattern; however, they retain all other nodes
 not involved in the pattern regards of other operations.
 
 Matched subgraph queries:
--------------------
+-------------------------
 Matched subgraph queries must begin with a "MATCH" statement. This
 produces the subgraph upon which the rest of the verbs will
 operate. After a graph is match, other projections can be perfomed
@@ -138,7 +133,7 @@ the future it will probably allow soft pattern matching to match
 partial patterns as well.
 
 Full graph queries:
------------------
+-------------------
 To perform an projection over the whole graph and return a modified
 copy, simply tell ProjX what you want to do by combining a verb and
 a simple pattern. Node Type aliases are not necessary for one-line
@@ -190,7 +185,3 @@ Predicates:
 -----------
 ProjX doesn't currently support predicates such as "AS", "WHERE",
 but it will soon.
-
-:param query: String. A ProjX query.
-:returns: networkx.Graph. The graph or subgraph with the required
-  schema modfications.
