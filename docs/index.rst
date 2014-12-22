@@ -42,11 +42,8 @@ Keywords:
 Verbs:
 ------
 - "MATCH" Matches a pattern of nodes based on type.
-- "TRANSFER" Merges the edges and/or (depending on object) attributes of nodes of one
-    type across a specified sequence of neighboring nodes
-    to nodes of another type.
-- "PROJECT" Projects a relationship between nodes of one
-    type across a specified sequence of neighboring nodes.
+- "TRANSFER" Merges the edges and/or (depending on object) attributes of nodes of one type across a specified sequence of neighboring nodes to nodes of another type.
+- "PROJECT" Projects a relationship between nodes of one type across a specified sequence of neighboring nodes.
 - "Combine" Combines two node types. NOT IMPLEMENTED
 - "RETURN" Specify table/graph and nodes to return. NOT IMPLEMENTED
 
@@ -54,14 +51,10 @@ Objects:
 --------
 Objects act as parameters that can be passed to verbs.
 
-- "GRAPH" When used with "MATCH" returns whole graph to operated over, 
-    not just a subgraph.
-- "SUBGRAPH" When used with "MATCH", results in just a matched subgraph,
-    this is the default setting, so is not necessary except for transparency.
-- "ATTRS" When used with "TRANSFER" only attributes will be 
-    transfered.
-- "EDGES" When used with "TRANSFER" only edges will be 
-    transfered.
+- "GRAPH" When used with "MATCH" returns whole graph to operated over, not just a subgraph.
+- "SUBGRAPH" When used with "MATCH", results in just a matched subgraph, this is the default setting, so is not necessary except for transparency.
+- "ATTRS" When used with "TRANSFER" only attributes will be transfered.
+- "EDGES" When used with "TRANSFER" only edges will be transfered.
 - "TABLE" Not implemented.
 
 Predicates:
@@ -70,13 +63,10 @@ Predicates:
 Predicates allow for fine tuned control of graph operations.
 
 - "DELETE" Determines what nodes should be deleted after performing verb based operations.
-- "METHOD" Describes method for determining edge weight upon projection, works 
-    when edges are projected over a single intermediate node type. Only implemented for 
-    Jaccard similarity coefficient.
+- "METHOD" Describes method for determining edge weight upon projection, works when edges are projected over a single intermediate node type. Only implemented for Jaccard similarity coefficient.
 - "SET" Determines what attributes will be retained and where after a "TRANSFER" or "PROJECT" statement.
 - "WHERE" NOT IMPLEMENTED
-- "NEW" A generic command that represent the new edges created by a projection (will also work
-    with "COMBINE" when implemented. 
+- "NEW" A generic command that represent the new edges created by a projection (will also work with "COMBINE" when implemented. 
 
 Patterns:
 =========

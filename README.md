@@ -24,7 +24,7 @@ Verbs:
     to nodes of another type.
 - "PROJECT" Projects a relationship between nodes of one
     type across a specified sequence of neighboring nodes.
-- "Combine" Combines two node types. NOT IMPLEMENTED
+- "COMBINE" Combines two node types. NOT IMPLEMENTED
 - "RETURN" Specify table/graph and nodes to return. NOT IMPLEMENTED
 
 Objects:
@@ -84,4 +84,4 @@ specifying edge types.
 - "(f1:Foo)-(b:Bar)-(f2:Foo)"
 - "(d:Dog)-[b:bites]-(c:Cat)"
 
-Thanks to versae for inspiring this project.
+Thanks to @versae for inspiring this project.
