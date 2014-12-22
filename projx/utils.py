@@ -55,9 +55,9 @@ def draw_simple_graph(graph, node_type_attr='type',
         e_labels = edge_labels(graph, edge_label_attr=edge_label_attr)
     else:
         e_labels = {}
-    return (nx.draw_networkx(graph, pos=pos, node_color=clrs),
-            nx.draw_networkx_edge_labels(graph, pos=pos, edge_labels=e_labels),
-            nx.draw_networkx_labels(graph, pos=pos, labels=lbls))
+    nx.draw_networkx(graph, pos=pos, node_color=clrs)
+    nx.draw_networkx_edge_labels(graph, pos=pos, edge_labels=e_labels)
+    nx.draw_networkx_labels(graph, pos=pos, labels=lbls)
 
 
 def labels(graph, label_attrs=['name']):

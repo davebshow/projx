@@ -23,19 +23,9 @@ class Projection(object):
         Main class for generating graph projections and schema modifications.
         Wraps a NetworkX graph, and then executes a query written in the
         ProjX query language over the graph. ProjX queries are based on
-        Neo4j"s Cypher syntax, but are currently considerably simpler -
-        lacking predicates, multiple matches, return statements, ordering etc.
+        Neo4j"s Cypher syntax, but are currently considerably simpler;
         However, they do add a few verbs to Cypher"s vocabulary, namely:
-        "TRANSFER" and "PROJECT". "TRANSFER" allows to transfer the attributes
-        of nodes of a designated type to all neighboring nodes of another
-        designated type. "TRANSFER" also has a variation "MERGE". "MERGE"
-        performs a normal "TRANSFER", but also transfers edges to the transfer
-        target There are two types of queries. The first type are Matched
-        pattern queries that act upon a pattern matched subgraph
-        of the wrapped graph. The second type consists of statements
-        that apply schema modifications across the entire wrapped graph.
-        Query language specifications are included in the documentation for
-        the execute method
+        "TRANSFER" and "PROJECT".
 
         :param graph: An multi-partite (multi-type) instance of
             networkx.Graph().
