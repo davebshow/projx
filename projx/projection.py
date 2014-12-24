@@ -41,7 +41,6 @@ class Projection(object):
         self.graph = graph
         self.node_type = node_type_attr
         self.edge_type = edge_type_attr
-        self._removals = set()
         self.parser = parser
         self._operations = {}
         self._operations_init()
@@ -517,11 +516,11 @@ class _MatchPattern(object):
             if edge:
                 edge = edge[0]
                 edge_alias = edge["alias"]
-                self.edge_alias[edge_alias] = i
+                self.edge_alias[edge_alias] = j
                 tp = edge.get("type", "")
                 if tp:
                     tp = tp[0]
             else:
                 tp = ""
-                self.edge_alias[""] = i
+                self.edge_alias[""] = j
             self.edge_type_seq.append(tp)
