@@ -4,8 +4,7 @@ ProjX
 
 **Pre-Alpha Version API breaking changes may occur over the next several months.**
 
-ProjX is an implementation of a query/schema manipulation language for NetworkX. It borrows some syntactic conventions from Neo4j Cypher, but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types. Currently, each statement (beggining with verb) iterates over all matched nodes, possibly in 
-the future this will occur in a pipeline that takes advantage of parallel processing, depending on my time ;) Also, the grammar will eventually probably do more validation and create an ETL style .json (based on Orientdb-ETL maybe) to allow for varied access to the core methods with either .json or the DSL: 
+ProjX is an implementation of a query/transformation DSL for NetworkX. It borrows some syntactic conventions from Neo4j Cypher, but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types. Currently, each statement (beggining with verb) iterates over all matched nodes, possibly in the future this will occur in a pipeline to speed things up a bit. Also, the grammar will eventually probably do more validation and create an ETL style JSON (based on Orientdb-ETL maybe) to allow for varied access to the core methods with either JSON or the DSL: 
 
 - Example Notebook: http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_demo.ipynb   
 
@@ -21,7 +20,7 @@ Verbs:
 - "MATCH" Matches a pattern of nodes based on type.
 - "TRANSFER" Merges the edges and/or (depending on object) attributes of nodes of one type across a specified sequence of neighboring nodes to nodes of another type.
 - "PROJECT" Projects a relationship between nodes of one type across a specified sequence of neighboring nodes.
-- "COMBINE" Combines two node types. NOT IMPLEMENTED
+- "COMBINE" Combines two node types creating new nodes.
 - "RETURN" Specify table/graph and nodes to return. NOT IMPLEMENTED
 
 Objects:
@@ -43,7 +42,7 @@ Predicates allow for fine tuned control of graph operations.
 - "METHOD" Describes method for determining edge weight upon projection, works when edges are projected over a single intermediate node type. Only implemented for Jaccard similarity coefficient.
 - "SET" Determines what attributes will be retained and where after a "TRANSFER" or "PROJECT" statement.
 - "WHERE" NOT IMPLEMENTED
-- "NEW" A generic command that represent the new edges created by a projection (will also work with "COMBINE" when implemented). 
+- "NEW" A generic command that represent the new edges created by a "PROJECT" or the new nodes created by "COMBINE". 
 
 Patterns:
 =========

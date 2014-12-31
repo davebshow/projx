@@ -520,7 +520,7 @@ def _transfer_attrs(attrs, to_set, mp, path, graph, node_type):
         elif attr1 in new_attrs:
             val = new_attrs[attr1]
             if not isinstance(val, set):
-                new_attrs[attrs1] = set([val])
+                new_attrs[attr1] = set([val])
             new_attrs[attr1].update([a])
         else:
             new_attrs[attr1] = set([a])
