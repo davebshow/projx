@@ -244,7 +244,6 @@ class Projection(object):
         removals = set()
         delete = []
         to_set = ''
-        method = ''
         node_ids = {}
         new_edges = []
         if pred_clause:
@@ -284,7 +283,7 @@ class Projection(object):
             nbrs.update(dict(graph[target_node]))
             # Have to check speed here with a bigger graph.
             nbrs = {k: v for (k, v) in nbrs.items() 
-                       if graph.node[k][self.node_type] not in null_types}
+                    if graph.node[k][self.node_type] not in null_types}
             new_edges += zip(
                 [new_node] * len(nbrs),
                 nbrs,
@@ -332,13 +331,11 @@ class Projection(object):
         source, target = _get_source_target(paths, mp, pattern)
         for path in paths:
             transfer_source = path[source]
-            transfer_target = path[target]
-            if delete:
-                for i in delete:
-                    removals.update([path[i]])
+            transfer_target = path[target]        
+            for i in delete:
+                removals.update([path[i]])
             if obj == "edges" or not obj:
                 edges = graph[transfer_source]
-                # This is naive.
                 new_edges = zip(
                     [transfer_target] * len(edges),
                     edges,
