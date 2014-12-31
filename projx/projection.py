@@ -326,6 +326,7 @@ class Projection(object):
         removals = set()
         delete = []
         to_set = ''
+        new_edges = []
         if pred_clause:
             to_set, delete, method = _process_predicate(pred_clause, mp)
         source, target = _get_source_target(paths, mp, pattern)
@@ -335,18 +336,18 @@ class Projection(object):
             for i in delete:
                 removals.update([path[i]])
             if obj == "edges" or not obj:
-                edges = graph[transfer_source]
-                new_edges = zip(
-                    [transfer_target] * len(edges),
-                    edges,
-                    [v for (k, v) in edges.items()]
+                nbrs = graph[transfer_source]
+                new_edges += zip(
+                    [transfer_target] * len(nbrs),
+                    nbrs,
+                    [v for (k, v) in nbrs.items()]
                 )
-                graph = self.add_edges_from(graph, new_edges)
             if (obj == "attrs" or not obj) and to_set:
                 attrs = graph.node[transfer_target]
                 new_attrs = _transfer_attrs(attrs, to_set, mp, path,
                                             graph, self.node_type)
                 graph.node[transfer_target] = new_attrs
+        graph = self.add_edges_from(graph, new_edges)
         graph.remove_nodes_from(removals)
         return graph, paths
 
