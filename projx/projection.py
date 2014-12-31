@@ -3,6 +3,77 @@ from itertools import chain
 import networkx as nx
 from grammar import parser
 
+"""
+EXAMPLE ETL
+
+{
+    "extractor": {
+        "networkx": {
+            "class": "subgraph",
+            "traversal": [
+                {"node": {"type": "Person", "alias": "p1"}},
+                {"edge": {}},
+                {"node": {"alias": "wild"}},
+                {"edge": {}},
+                {"node": {"type": "Person", "alias": "p2"}}
+            ]
+        }
+    },
+    "transformers": [
+        {"project": {
+                "pattern": [
+                    {"node": {"alias": "p1"}},
+                    {"edge": {}},
+                    {"node": {"alias": "p2"}}
+                ],
+                "set": [
+                    {
+                        "alias": "NEW",
+                        "key": "name",
+                        "value":"",
+                        "value_lookup": "wild.name"
+                    }
+                ]
+            }
+        },
+        {"delete": {"alias": ["wild"]}}
+    ],
+    "loader": {
+        "networkx": {"class": "nx.Graph"}
+    }
+}
+"""
+
+def execute_etl(graph, etl_json):
+    etl = ETL(etl_json)
+    graph = etl.extractor(graph)
+    paths = graph.match()
+
+
+class ETL(object):
+
+    def __init__(self, etl):
+        self._extractors = {}
+        self._init_extractors()
+        self.extractor_name = etl["extractor"].items()[0]
+        self.class = etl[self.extractor_name]["class"]
+        self.traversal = etl[self.extractor_name]["traversal"]
+        self.extractor = self.extractors[self.extractor_name]
+
+    def _get_extractors(self):
+        return self._extractors 
+    extractors = property(fget=_get_extractors)
+
+    def extractors_wrapper(self, extractor):
+        def wrapper(fn):
+            self.extractors[extractor]
+
+    def _init_extractors(self):
+
+        @extractors_wrapper("networkx")
+        def nx_extractor(graph):
+            return NXProjection(graph)
+    
 
 def error_handler(fn):
     """
@@ -17,7 +88,16 @@ def error_handler(fn):
     return wrapper
 
 
-class Projection(object):
+class BaseProjection(object):
+
+    def match(self):
+        raise NotImplementedError()
+
+    def _match(self):
+        raise NotImplementedError()
+
+
+class NXProjection(BaseProjection):
     def __init__(self, graph, node_type_attr="type", edge_type_attr="type"):
         """
         Main class for generating graph projections and schema modifications.
@@ -36,6 +116,7 @@ class Projection(object):
         """
         # Preserve the original node in an attribute called node,
         # then relabel the nodes with integers.
+        super(NXProjection, self).__init__()
         for node in graph.nodes():
             graph.node[node]["visited_from"] = []
             graph.node[node]["node"] = node
