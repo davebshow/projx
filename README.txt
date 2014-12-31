@@ -2,6 +2,9 @@
 ProjX
 =====
 
+**API broken as promised ;) Please:
+- pip uninstall ProjX
+- pip install projx.**
 **Pre-Alpha Version API breaking changes may occur over the next several months.**
 
 ProjX is an implementation of a query/transformation DSL for NetworkX. It borrows some syntactic conventions from Neo4j Cypher, but is much simpler, and focuses on matching subgraphs then making transformations to the graph based on node types. Currently, each statement (beggining with verb) iterates over all matched nodes, possibly in the future this will occur in a pipeline to speed things up a bit. Also, the grammar will eventually probably do more validation and create an ETL style JSON (based on Orientdb-ETL maybe) to allow for varied access to the core methods with either JSON or the DSL: 
