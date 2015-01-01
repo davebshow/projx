@@ -3,13 +3,14 @@ from itertools import chain
 import networkx as nx
 from grammar import parser
 
-"""
-EXAMPLE ETL
 
-{
+
+example_etl = {
     "extractor": {
         "networkx": {
             "class": "subgraph",
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
             "traversal": [
                 {"node": {"type": "Person", "alias": "p1"}},
                 {"edge": {}},
@@ -33,32 +34,118 @@ EXAMPLE ETL
                         "value":"",
                         "value_lookup": "wild.name"
                     }
-                ]
+                ],
+                "delete": {"alias": ["wild"]}
             }
-        },
-        {"delete": {"alias": ["wild"]}}
+        }
     ],
     "loader": {
-        "networkx": {"class": "nx.Graph"}
+        "networkx": {}
     }
 }
-"""
 
-def execute_etl(graph, etl_json):
-    etl = ETL(etl_json)
-    graph = etl.extractor(graph)
-    paths = graph.match()
+
+def execute_etl(graph, etl):
+    etl = ETL(etl)
+    # Depending on extractor, this will be something like projx.NXProjection.
+    projection = etl.extractor(graph, node_type_attr=etl.node_type_attr,
+                               edge_type_attr=etl.edge_type_attr)
+    paths = projection.match(etl.node_type_seq, etl.edge_type_seq)
+    # This is not extensible at the moment.
+    # Will implement this protocol in ETL class as a plugable method maybe.
+    if etl.loader == 'networkx':
+        if etl.subgraph == "graph":
+            graph = projection.copy()
+        else:
+            graph = projection.build_subgraph(paths)    
+        graph = nx_transform_pipeline(etl, projection, graph, paths)
+    else:
+        raise NotImplementedError("Currently only loads to NetworkX")
+    return graph
+
+
+def nx_transform_pipeline(etl, projection, graph, paths):
+    """
+    Map transformation rules on paths, and then apply to graph.
+    :returns: Graph. 
+    """
+    removals = set()
+    for path in paths:
+        for transformer in etl.transformers:
+            transformation = transformer.keys()[0]
+            pattern = transformer[transformation]["pattern"]
+            source, target = _get_source_target(etl, pattern)
+            source_node = path[source]
+            target_node = path[target]
+            to_set = transformer.get("set", [])
+            #### JUST IMPLEMENT METHODS FOR ####
+            fn = projection.operations[transformer]
+            #graph = fn(source_node, target_node, to_set, graph)
+            delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+            to_delete = [etl.node_alias[alias] for alias in delete_alias]
+        for i in to_delete:
+            removals.update([path[i]])
+    graph.remove_nodes_from(removals)
+    return graph
+
+
+def _get_source_target(etl, pattern):
+    """
+    Uses _MatchPattern"s alias system to perform a pattern match.
+
+    :param mp: _MatchPattern. The initital pattern specified
+                          in "MATCH" statement or in one-line query.
+    :param pattern: String. A valid pattern string of aliases.
+    """
+    alias_seq = [p["node"]["alias"] for p in pattern[0::2]]
+    source = etl.node_alias[alias_seq[0]]
+    target = etl.node_alias[alias_seq[-1]]
+    return source, target
 
 
 class ETL(object):
 
     def __init__(self, etl):
+        # Maybe write a validator for etl.
+        try:
+            extractor = etl["extractor"]
+            self.extractor_name = extractor.keys()[0]
+        except KeyError:
+            raise Error("Please define valid extractor")
+        self.subgraph = extractor[self.extractor_name].get("class", "subgraph")
+        
+        self.node_type_attr = extractor[self.extractor_name].get("node_type_attr", "type")
+        self.edge_type_attr = extractor[self.extractor_name].get("edge_type_attr", "type")
+        # Making it easy to add new extractors (hopefully)
         self._extractors = {}
         self._init_extractors()
-        self.extractor_name = etl["extractor"].items()[0]
-        self.class = etl[self.extractor_name]["class"]
-        self.traversal = etl[self.extractor_name]["traversal"]
         self.extractor = self.extractors[self.extractor_name]
+
+        # This is the traversal pattern
+        self.traversal = extractor[self.extractor_name]["traversal"]
+        self.nodes = self.traversal[0::2]
+        self.edges = self.traversal[1::2]
+        # Build up type/alias sequence for use in traversal/projection
+        try:
+            self.node_alias = {node["node"]["alias"]: i for 
+                               (i, node) in enumerate(self.nodes)}
+            self.edge_alias = {edge["edge"].get("alias", i): i for 
+                               (i, edge) in enumerate(self.edges)}
+            self.node_type_seq = [node["node"].get(self.node_type_attr, "") 
+                                  for node in self.nodes]
+            self.edge_type_seq = [edge["edge"].get(self.edge_type_attr, "") 
+                                  for edge in self.edges]
+
+        except KeyError:
+            raise Error("Please define valid traversal sequence")
+        # Currently accepts only 1 transformer.
+        try:
+            self.transformers = etl["transformers"]
+        except:
+            pass
+
+        self.loader = etl["loader"].keys()[0]
+         
 
     def _get_extractors(self):
         return self._extractors 
@@ -66,13 +153,16 @@ class ETL(object):
 
     def extractors_wrapper(self, extractor):
         def wrapper(fn):
-            self.extractors[extractor]
+            self.extractors[extractor] = fn
+        return wrapper
 
     def _init_extractors(self):
-
-        @extractors_wrapper("networkx")
-        def nx_extractor(graph):
-            return NXProjection(graph)
+        """
+        Update extractors dict to allow for extensible extractor functionality.
+        """
+        @self.extractors_wrapper("networkx")
+        def nx_extractor(graph, node_type_attr, edge_type_attr):
+            return NXProjection(graph, node_type_attr, edge_type_attr)
     
 
 def error_handler(fn):
@@ -93,10 +183,11 @@ class BaseProjection(object):
     def match(self):
         raise NotImplementedError()
 
-    def _match(self):
+    def copy(self):
         raise NotImplementedError()
 
 
+# Maybe change to pure functions....
 class NXProjection(BaseProjection):
     def __init__(self, graph, node_type_attr="type", edge_type_attr="type"):
         """
@@ -127,6 +218,9 @@ class NXProjection(BaseProjection):
         self.parser = parser
         self._operations = {}
         self._operations_init()
+
+    def copy(self):
+        return graph.copy()
 
     def operations_wrapper(self, verb):
         """
@@ -159,16 +253,16 @@ class NXProjection(BaseProjection):
         (transfer and project).
         """
         @self.operations_wrapper("project")
-        def execute_project(graph, paths, mp, pattern, obj, pred_clause):
-            return self._project(graph, paths, mp, pattern, obj, pred_clause)
+        def execute_project(source, target, to_set, graph):
+            return self._project(source, target, to_set, graph)
 
         @self.operations_wrapper("transfer")
-        def execute_transfer(graph, paths, mp, pattern, obj, pred_clause):
-            return self._transfer(graph, paths, mp, pattern, obj, pred_clause)
+        def execute_transfer(source, target, to_set, graph):
+            return self._transfer(source, target, to_set, graph)
 
         @self.operations_wrapper("combine")
-        def execute_combine(graph, paths, mp, pattern, obj, pred_clause):
-            return self._combine(graph, paths, mp, pattern, obj, pred_clause)
+        def execute_combine(source, target, to_set, graph):
+            return self._combine(source, target, to_set, graph)
 
     def _clear(self, nbunch):
         """
@@ -179,69 +273,21 @@ class NXProjection(BaseProjection):
         for node in nbunch:
             self.graph.node[node]["visited_from"] = []
 
-    #@error_handler
-    def execute(self, query):
-        '''
-        This takes a ProjX query and executes it.
-
-        :param query: String. A ProjX query.
-        :returns: networkx.Graph. The graph or subgraph with the required
-                  schema modfications.
-        '''
-        clauses = self.parser.parseString(query)
-        match = clauses[0]
-        obj = match.get("object", "")
-        pattern = match["pattern"]
-        pred_clause = match.get("predicates", "")
-        mp = _MatchPattern(pattern)  # Fix pattern processor
-        graph, paths = self._match(mp, obj=obj, pred_clause=pred_clause)
-        for clause in clauses[1:]:
-            verb = clause["verb"]
-            # Here I can check for match to create second subgraph.
-            obj = clause.get("object", "")
-            pattern = clause["pattern"]
-            pred_clause = clause.get("predicates", "")
-            operation = self.operations[verb]
-            graph, paths = operation(graph, paths, mp, pattern,
-                                     obj, pred_clause)
-        return graph
-
-    def match(self, paths):
-        """
-        Will form part of programmatic api.
-
-        :param path: List of lists. The paths matched
-                     by the _match method.
-        :returns: networkx.Graph. A matched subgraph.
-        """
-        pass
-
-    def _match(self, mp, graph=None, obj=None, pred_clause=None):
+    def match(self, node_type_seq, edge_type_seq):
         """
         Executes traversals to perform initial match on pattern.
 
         :param pattern: String. A valid pattern string.
         :returns: List of lists. The matched paths.
         """
-
-        if not graph:
-            graph = self.graph.copy()
-        node_type_seq = mp.node_type_seq
-        edge_type_seq = mp.edge_type_seq
         start_type = node_type_seq[0]
         path_list = []
-        for node, attrs in graph.nodes(data=True):
+        for node, attrs in self.graph.nodes(data=True):
             if attrs[self.node_type] == start_type or not start_type:
                 paths = self.traverse(node, node_type_seq[1:], edge_type_seq)
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
-        if not paths:
-            raise Exception("There are no nodes matching "
-                            "the given type sequence. Check for "
-                            "input errors.")
-        if obj != 'graph':
-            graph = self.build_subgraph(paths)
-        return graph, paths
+        return paths
 
     def project(self, mp):
         """
@@ -262,7 +308,7 @@ class NXProjection(BaseProjection):
 
         :param graph: networkx.Graph. A copy of the wrapped grap or its
                       subgraph.
-        :param path: List of lists. The paths matched
+        :param path: List of lists of lists. The paths matched
                      by the _match method based.
         :param mp: _MatchPattern. The initital pattern specified
                               in "MATCH" statement or in one-line query.
@@ -282,24 +328,31 @@ class NXProjection(BaseProjection):
         for path in paths:
             source_node = path[source]
             target_node = path[target]
+            # Don't remove without delete
             if source < target:
                 remove = path[source + 1:target]
             else:
                 remove = path[target + 1:source]
             new_attrs = {}
+            # Set attrs
             if to_set:
                 new_attrs = _transfer_attrs(new_attrs, to_set, mp,
                                             path, graph, self.node_type)
+            # This will be a seperate calculation
             if ((method == "jaccard" or not method) and
                 abs(source - target) == 2):
-                # Calculate Jaccard index for edge weight.
-                snbrs = set(graph[source_node])
+                # Calculate Jaccard index for edge weight. Do something like this to avoid 
+                # newly created edges 
+                snbrs = {node for node  in graph[source_node].keys()
+                         if graph.node[self.node_type_attr] not in [these are forbidden types]}
                 tnbrs = set(graph[target_node])
                 intersect = snbrs & tnbrs
                 union = snbrs | tnbrs
                 jaccard = float(len(intersect)) / len(union)
                 new_attrs["weight"] = jaccard
+            # Don't remove without delete
             removals.update(remove)
+            ##### Add new edge
             new_edges.append((source_node, target_node, new_attrs))
         graph = self.add_edges_from(graph, new_edges)
         graph.remove_nodes_from(removals)
@@ -604,87 +657,3 @@ def _transfer_attrs(attrs, to_set, mp, path, graph, node_type):
         else:
             new_attrs[attr1] = set([a])
     return new_attrs
-
-
-def _process_predicate(pred_clause, mp):
-    """
-    Iterate over predicate clauses and prepare necessary input
-    for operations.
-
-    :param pred_clause: Container of predicate clauses generated by parser.
-    :param mp: _MatchPattern. Object containing alias mappings.
-
-    :return to_set: List. A list of dict containing attr values.
-    :return delete: List. A list of int nodes to delete.
-    :method: String. A method for calculating edge weight during projection.
-
-    """
-    to_set = []
-    delete = []
-    method = ''
-    preds = pred_clause[0]['pred_clauses']
-    for pred in preds:
-        p = pred['predicate']
-        if p == 'set':
-            to_set = pred['pred_objects']
-        elif p == 'delete':
-            # This is a list of the path index of nodes based on their alias.
-            delete = [
-                mp.node_alias[p] for p in pred['pred_objects']
-            ]
-        elif p == 'method':
-            method = pred['pred_objects'][0]
-    return to_set, delete, method
-
-
-def _get_source_target(paths, mp, pattern):
-    """
-    Uses _MatchPattern"s alias system to perform a pattern match.
-
-    :param mp: _MatchPattern. The initital pattern specified
-                          in "MATCH" statement or in one-line query.
-    :param pattern: String. A valid pattern string of aliases.
-    """
-    alias_seq = [p[0] for p in pattern]
-    source = mp.node_alias[alias_seq[0]]
-    target = mp.node_alias[alias_seq[-1]]
-    return source, target
-
-
-class _MatchPattern(object):
-
-    def __init__(self, pattern):
-        """
-        This is a helper class that takes a match pattern and
-        maintains an alias dictionary. This allows for multi-line
-        queries to utilize aliases.
-
-        :param pattern: String. A ProjX language pattern.
-        """
-        self.pattern = pattern
-        self.nodes = pattern["nodes"]
-        self.edges = pattern["edges"]
-        self.node_alias = {}
-        self.edge_alias = {}
-        self.node_type_seq = []
-        self.edge_type_seq = []
-        for i, node in enumerate(self.nodes):
-            node = node[0]
-            node_alias = node["alias"]
-            self.node_alias[node_alias] = i
-            tp = node.get("type", "")
-            if tp:
-                tp = tp[0]
-            self.node_type_seq.append(tp)
-        for j, edge in enumerate(self.edges):
-            if edge:
-                edge = edge[0]
-                edge_alias = edge["alias"]
-                self.edge_alias[edge_alias] = j
-                tp = edge.get("type", "")
-                if tp:
-                    tp = tp[0]
-            else:
-                tp = ""
-                self.edge_alias[""] = j
-            self.edge_type_seq.append(tp)
