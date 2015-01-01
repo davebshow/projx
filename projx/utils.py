@@ -40,6 +40,87 @@ def test_graph():
     return g
 
 
+project_etl = {
+    "extractor": {
+        "networkx": {
+            "class": "subgraph",
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
+            "traversal": [
+                {"node": {"type": "Person", "alias": "p1"}},
+                {"edge": {}},
+                {"node": {"alias": "wild"}},
+                {"edge": {}},
+                {"node": {"type": "Person", "alias": "p2"}}
+            ]
+        }
+    },
+    "transformers": [
+        {
+            "project": {
+                "method": {"jaccard": {"over": ["Institution", "City"]}},
+                "pattern": [
+                    {"node": {"alias": "p1"}},
+                    {"edge": {}},
+                    {"node": {"alias": "p2"}}
+                ],
+                "set": [
+                    {
+                        "alias": "NEW",
+                        "key": "name",
+                        "value":"",
+                        "value_lookup": "wild.name"
+                    }
+                ],
+                "delete": {"alias": ["wild"]}
+            }
+        }
+    ],
+    "loader": {
+        "networkx": {}
+    }
+}
+
+
+transfer_etl = {
+    "extractor": {
+        "networkx": {
+            "class": "graph",
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
+            "traversal": [
+                {"node": {"type": "City", "alias": "c"}},
+                {"edge": {}},
+                {"node": {"type": "Institution", "alias": "i"}},
+            ]
+        }
+    },
+    "transformers": [
+        {
+            "transfer": {
+                "pattern": [
+                    {"node": {"alias": "c"}},
+                    {"edge": {}},
+                    {"node": {"alias": "i"}}
+                ],
+                "set": [
+                    {
+                        "alias": "i",
+                        "key": "name",
+                        "value":"",
+                        "value_lookup": "c.name"
+                    }
+                ],
+                "delete": {"alias": ["c"]}
+            }
+        }
+    ],
+    "loader": {
+        "networkx": {}
+    }
+}
+
+
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['name']):
