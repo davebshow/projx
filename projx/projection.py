@@ -21,7 +21,9 @@ example_etl = {
         }
     },
     "transformers": [
-        {"project": {
+        {
+            "project": {
+                "method": {"jaccard": {"over": ["Institution", "City"]}},
                 "pattern": [
                     {"node": {"alias": "p1"}},
                     {"edge": {}},
@@ -48,19 +50,149 @@ example_etl = {
 def execute_etl(graph, etl):
     etl = ETL(etl)
     # Depending on extractor, this will be something like projx.NXProjection.
-    projection = etl.extractor(graph, node_type_attr=etl.node_type_attr,
-                               edge_type_attr=etl.edge_type_attr)
+    extractor = etl.extractor
+    projection = extractor(graph, node_type_attr=etl.node_type_attr,
+                           edge_type_attr=etl.edge_type_attr)
+    # Return paths or stream to be passed to loader transformer.
     paths = projection.match(etl.node_type_seq, etl.edge_type_seq)
-    # This is not extensible at the moment.
-    # Will implement this protocol in ETL class as a plugable method maybe.
-    if etl.loader == 'networkx':
-        if etl.subgraph == "graph":
-            graph = projection.copy()
-        else:
-            graph = projection.build_subgraph(paths)    
+    # Loader should transform and load to 
+    loader = etl.loader
+    graph = loader(etl, projection, paths)
+    return graph
+
+
+class ETL(object):
+
+    def __init__(self, etl):
+        # Maybe write a validator for etl.
+        try:
+            extractor = etl["extractor"]
+            self.extractor_name = extractor.keys()[0]
+        except KeyError:
+            raise Error("Please define valid extractor")
+
+        # This determines whether to extract the whole graph or just a subgraph
+        self.subgraph = extractor[self.extractor_name].get("class", "subgraph")
+        
+        self.node_type_attr = extractor[self.extractor_name].get("node_type_attr", "type")
+        self.edge_type_attr = extractor[self.extractor_name].get("edge_type_attr", "type")
+
+        # Making it easy to add new extractors (hopefully)
+        self._extractors = {}
+        self._init_extractors()
+        self.extractor = self.extractors[self.extractor_name]
+
+        # This is for NetworkX graphs
+        self.traversal = extractor[self.extractor_name].get("traversal", [])
+        # This is for Neo4j - future
+        self.query = extractor[self.extractor_name].get("query", "")
+
+        self.transformers = etl.get("transformers", [])
+        self.loader_name = etl["loader"].keys()[0]
+
+        # Making it easy to add new loaders (hopefully)
+        self._loaders = {}
+        self._init_loaders()
+        self.loader = self.loaders[self.loader_name]
+         
+
+    def _get_extractors(self):
+        return self._extractors 
+    extractors = property(fget=_get_extractors)
+
+    def extractors_wrapper(self, extractor):
+        def wrapper(fn):
+            self.extractors[extractor] = fn
+        return wrapper
+
+    def _init_extractors(self):
+        """
+        Update extractors dict to allow for extensible extractor functionality.
+        """
+        @self.extractors_wrapper("networkx")
+        def nx_extractor(graph, node_type_attr, edge_type_attr):
+            # Set all of the attrs required for NetworkX work.
+            # This is the traversal pattern
+            self.nodes = self.traversal[0::2]
+            self.edges = self.traversal[1::2]
+            # Build up type/alias sequence for use in traversal/projection
+            try:
+                self.node_alias = {node["node"]["alias"]: i for 
+                                   (i, node) in enumerate(self.nodes)}
+                self.edge_alias = {edge["edge"].get("alias", i): i for 
+                                   (i, edge) in enumerate(self.edges)}
+                self.node_type_seq = [node["node"].get(self.node_type_attr, "") 
+                                      for node in self.nodes]
+                self.edge_type_seq = [edge["edge"].get(self.edge_type_attr, "") 
+                                      for edge in self.edges]
+            except KeyError:
+                raise Error("Please define valid traversal sequence")
+            return NXProjection(graph, node_type_attr, edge_type_attr)
+
+    def _get_loader(self):
+        return self._loaders 
+    loaders = property(fget=_get_loader)
+
+    def loaders_wrapper(self, loader):
+        def wrapper(fn):
+            self.loaders[loader] = fn
+        return wrapper
+
+    def _init_loaders(self):
+        """
+        Update extractors dict to allow for extensible extractor functionality.
+        """
+        @self.loaders_wrapper("networkx")
+        def nx_extractor(etl, projection, paths):
+            return nx_loader(etl, projection, paths)
+    
+
+# Functions to load and transform NetworkX graph
+def nx_loader(etl, projection, paths):
+    if etl.subgraph == "graph":
+        graph = projection.copy()
+    else:
+        graph = projection.build_subgraph(paths)   
+    if len(etl.transformers) > 1: 
         graph = nx_transform_pipeline(etl, projection, graph, paths)
     else:
-        raise NotImplementedError("Currently only loads to NetworkX")
+        graph = nx_transform(etl, projection, graph, paths)
+    return graph
+
+
+def nx_transform(etl, projection, graph, paths):
+    #import ipdb; ipdb.set_trace()
+    removals = set()
+    transformer = etl.transformers[0]
+    transformation = transformer.keys()[0]
+    pattern = transformer[transformation]["pattern"]
+    source, target = _get_source_target(etl, pattern)
+    to_set = transformer[transformation].get("set", [])
+    #### JUST IMPLEMENT METHODS FOR ####
+    fn = projection.operations[transformation]
+    delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+    to_delete = [etl.node_alias[alias] for alias in delete_alias]
+    method = transformer[transformation].get("method", {})
+    for path in paths:
+        source_node = path[source]
+        target_node = path[target]
+        # To set get attrs.
+        attrs = {}
+        for i, attr in enumerate(to_set):
+            key = attr.get("key", i)
+            value = attr.get("value", "")
+            if not value:
+                lookup = attr.get("value_lookup", "")
+                if lookup:
+                    alias, lookup_key = lookup.split(".")
+                    alias_index = etl.node_alias[alias]
+                    node = path[alias_index]
+                    value = graph.node[node][lookup_key]
+            attrs[key] = value
+        graph = fn(source_node, target_node, attrs, graph, method=method)
+        for i in to_delete:
+            removals.update([path[i]])
+    graph.remove_nodes_from(removals)
     return graph
 
 
@@ -77,10 +209,22 @@ def nx_transform_pipeline(etl, projection, graph, paths):
             source, target = _get_source_target(etl, pattern)
             source_node = path[source]
             target_node = path[target]
-            to_set = transformer.get("set", [])
-            #### JUST IMPLEMENT METHODS FOR ####
-            fn = projection.operations[transformer]
-            #graph = fn(source_node, target_node, to_set, graph)
+            to_set = transformer[transformation].get("set", [])
+            method = transformer[transformation].get("method", {})
+            attrs = {}
+            for i, attr in enumerate(to_set):
+                key = attr.get("key", i)
+                value = attr.get("value", "")
+                if not value:
+                    lookup = attr.get("value_lookup", "")
+                    if lookup:
+                        alias, lookup_key = lookup.split(".")
+                        alias_index = etl.node_alias[alias]
+                        node = path[alias_index]
+                        value = graph.node[node][lookup_key]
+                attrs[key] = value
+            fn = projection.operations[transformation]
+            #graph = fn(source_node, target_node, attrs, graph, method=method)
             delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
             to_delete = [etl.node_alias[alias] for alias in delete_alias]
         for i in to_delete:
@@ -103,84 +247,14 @@ def _get_source_target(etl, pattern):
     return source, target
 
 
-class ETL(object):
-
-    def __init__(self, etl):
-        # Maybe write a validator for etl.
-        try:
-            extractor = etl["extractor"]
-            self.extractor_name = extractor.keys()[0]
-        except KeyError:
-            raise Error("Please define valid extractor")
-        self.subgraph = extractor[self.extractor_name].get("class", "subgraph")
-        
-        self.node_type_attr = extractor[self.extractor_name].get("node_type_attr", "type")
-        self.edge_type_attr = extractor[self.extractor_name].get("edge_type_attr", "type")
-        # Making it easy to add new extractors (hopefully)
-        self._extractors = {}
-        self._init_extractors()
-        self.extractor = self.extractors[self.extractor_name]
-
-        # This is the traversal pattern
-        self.traversal = extractor[self.extractor_name]["traversal"]
-        self.nodes = self.traversal[0::2]
-        self.edges = self.traversal[1::2]
-        # Build up type/alias sequence for use in traversal/projection
-        try:
-            self.node_alias = {node["node"]["alias"]: i for 
-                               (i, node) in enumerate(self.nodes)}
-            self.edge_alias = {edge["edge"].get("alias", i): i for 
-                               (i, edge) in enumerate(self.edges)}
-            self.node_type_seq = [node["node"].get(self.node_type_attr, "") 
-                                  for node in self.nodes]
-            self.edge_type_seq = [edge["edge"].get(self.edge_type_attr, "") 
-                                  for edge in self.edges]
-
-        except KeyError:
-            raise Error("Please define valid traversal sequence")
-        # Currently accepts only 1 transformer.
-        try:
-            self.transformers = etl["transformers"]
-        except:
-            pass
-
-        self.loader = etl["loader"].keys()[0]
-         
-
-    def _get_extractors(self):
-        return self._extractors 
-    extractors = property(fget=_get_extractors)
-
-    def extractors_wrapper(self, extractor):
-        def wrapper(fn):
-            self.extractors[extractor] = fn
-        return wrapper
-
-    def _init_extractors(self):
-        """
-        Update extractors dict to allow for extensible extractor functionality.
-        """
-        @self.extractors_wrapper("networkx")
-        def nx_extractor(graph, node_type_attr, edge_type_attr):
-            return NXProjection(graph, node_type_attr, edge_type_attr)
-    
-
-def error_handler(fn):
-    """
-    Wraps the execute method. Will do error handling here.
-    """
-    def wrapper(self, query, **kwargs):
-        try:
-            graph = fn(self, query)
-        except:
-            raise Exception("Check query and graph. An error occurred.")
-        return graph
-    return wrapper
-
-
 class BaseProjection(object):
 
     def match(self):
+        """
+        This method should return a list of paths, or a generator,
+        or a stream containing paths. Something that can be passed 
+        to the transformer/loader.
+        """
         raise NotImplementedError()
 
     def copy(self):
@@ -213,8 +287,8 @@ class NXProjection(BaseProjection):
             graph.node[node]["node"] = node
         mapping = dict(zip(graph.nodes(), range(0, graph.number_of_nodes())))
         self.graph = nx.relabel_nodes(graph, mapping)
-        self.node_type = node_type_attr
-        self.edge_type = edge_type_attr
+        self.node_type_attr = node_type_attr
+        self.edge_type_attr = edge_type_attr
         self.parser = parser
         self._operations = {}
         self._operations_init()
@@ -253,16 +327,16 @@ class NXProjection(BaseProjection):
         (transfer and project).
         """
         @self.operations_wrapper("project")
-        def execute_project(source, target, to_set, graph):
-            return self._project(source, target, to_set, graph)
+        def execute_project(source, target, attrs, graph, **kwargs):
+            return self._project(source, target, attrs, graph, **kwargs)
 
         @self.operations_wrapper("transfer")
-        def execute_transfer(source, target, to_set, graph):
-            return self._transfer(source, target, to_set, graph)
+        def execute_transfer(source, target, attrs, graph, **kwargs):
+            return self._transfer(source, target, attrs, graph, **kwargs)
 
         @self.operations_wrapper("combine")
-        def execute_combine(source, target, to_set, graph):
-            return self._combine(source, target, to_set, graph)
+        def execute_combine(source, target, attrs, graph, **kwargs):
+            return self._combine(source, target, attrs, graph, **kwargs)
 
     def _clear(self, nbunch):
         """
@@ -283,7 +357,7 @@ class NXProjection(BaseProjection):
         start_type = node_type_seq[0]
         path_list = []
         for node, attrs in self.graph.nodes(data=True):
-            if attrs[self.node_type] == start_type or not start_type:
+            if attrs[self.node_type_attr] == start_type or not start_type:
                 paths = self.traverse(node, node_type_seq[1:], edge_type_seq)
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
@@ -302,7 +376,7 @@ class NXProjection(BaseProjection):
         """
         pass
 
-    def _project(self, graph, paths, mp, pattern, obj=None, pred_clause=None):
+    def _project(self, source, target, attrs, graph, **kwargs):
         """
         Executes graph "PROJECT" projection.
 
@@ -317,46 +391,48 @@ class NXProjection(BaseProjection):
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-        removals = set()
-        delete = []
-        to_set = ''
-        method = ''
-        if pred_clause:
-            to_set, delete, method = _process_predicate(pred_clause, mp)
-        source, target = _get_source_target(paths, mp, pattern)
-        new_edges = []
-        for path in paths:
-            source_node = path[source]
-            target_node = path[target]
-            # Don't remove without delete
-            if source < target:
-                remove = path[source + 1:target]
-            else:
-                remove = path[target + 1:source]
-            new_attrs = {}
-            # Set attrs
-            if to_set:
-                new_attrs = _transfer_attrs(new_attrs, to_set, mp,
-                                            path, graph, self.node_type)
-            # This will be a seperate calculation
-            if ((method == "jaccard" or not method) and
-                abs(source - target) == 2):
-                # Calculate Jaccard index for edge weight. Do something like this to avoid 
-                # newly created edges 
-                snbrs = {node for node  in graph[source_node].keys()
-                         if graph.node[self.node_type_attr] not in [these are forbidden types]}
-                tnbrs = set(graph[target_node])
-                intersect = snbrs & tnbrs
-                union = snbrs | tnbrs
-                jaccard = float(len(intersect)) / len(union)
-                new_attrs["weight"] = jaccard
-            # Don't remove without delete
-            removals.update(remove)
-            ##### Add new edge
-            new_edges.append((source_node, target_node, new_attrs))
-        graph = self.add_edges_from(graph, new_edges)
-        graph.remove_nodes_from(removals)
-        return graph, paths
+
+
+        # This will be a seperate calculation
+        reserved = ['weight', self.edge_type_attr]
+        # Ugly
+        method = kwargs.get("method", "")
+        if method:
+            try:
+                algo = method.keys()[0]
+                over = method[algo].get("over", [])
+            except IndexError:
+                raise Error("Please define edge weight calculation method.")
+        else:
+            algo = ""
+            over = []
+        if algo == "jaccard" or not algo:
+            snbrs = {node for node  in graph[source].keys()
+                     if graph.node[node][self.node_type_attr] in over}
+            tnbrs = {node for node in graph[target].keys()
+                     if graph.node[node][self.node_type_attr] in over}
+            intersect = snbrs & tnbrs
+            union = snbrs | tnbrs
+            jaccard = float(len(intersect)) / len(union)
+            attrs["weight"] = jaccard
+        if graph.has_edge(source, target):
+            # Merge new edge attrs
+            edge_attrs = graph[source][target]
+            for k, v in attrs.items():
+                if k in reserved:
+                    edge_attrs[k] = v
+                elif k not in edge_attrs:
+                    edge_attrs[k] = set([v])
+                else:
+                    val = edge_attrs[k]
+                    if not isinstance(val, set):
+                        edge_attrs[k] = set([val])
+                    edge_attrs[k].update([v])
+            graph.adj[source][target] = edge_attrs
+            graph.adj[target][source] = edge_attrs
+        else:
+            graph.add_edge(source, target, attrs)
+        return graph
 
     def _combine(self, graph, paths, mp, pattern, obj=None, pred_clause=None):
 
@@ -524,7 +600,7 @@ class NXProjection(BaseProjection):
                 nbrs = set(self.graph[current]) - set([current])
                 for nbr in nbrs:
                     edge_type_attr = self.graph[current][nbr].get(
-                        self.edge_type,
+                        self.edge_type_attr,
                         None
                     )
                     attrs = self.graph.node[nbr]
@@ -538,7 +614,7 @@ class NXProjection(BaseProjection):
                             nbr not in stack and
                             (edge_type_attr == edge_type_seq[depth] or
                              edge_type_seq[depth] == "") and
-                            (attrs[self.node_type] == node_type_seq[depth] or
+                            (attrs[self.node_type_attr] == node_type_seq[depth] or
                              node_type_seq[depth] == "")):
                         self.graph.node[nbr]["visited_from"].append(current)
                         visited.update([nbr])
