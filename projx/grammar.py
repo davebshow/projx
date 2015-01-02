@@ -1,6 +1,7 @@
+from itertools import cycle, islice
 from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group, 
                        stringEnd, Suppress, Literal, CaselessKeyword,
-                       Optional, Forward, quotedString)
+                       Optional, Forward, quotedString, Dict, nestedExpr)
 
 
 # Used throughout as a variable/attr name.
@@ -42,6 +43,7 @@ node_content = Group(
     var.setResultsName("alias") +
     Optional(tp).setResultsName("type")
 )
+
 
 node = node_open + node_content + node_close
 
@@ -119,3 +121,79 @@ clause = Group(
 )
 
 parser = OneOrMore(clause) + stringEnd
+
+def parse_query(query):
+    """
+    REWRITE - Not gonna use big parser, just a routine with small parse elements.
+    """
+    clauses = parser.parseString(query)
+    match = clauses[0]
+    obj = match.get("object", "subgraph")
+    pattern = match["pattern"]
+    nodes = [
+        {"node": {"alias": node[0]["alias"], "type": node[0].get("type", [""])[0]}} 
+        for node in pattern["nodes"]
+    ]
+    edges = [
+        {"edge": {"alias": edge[0].get("alias", ""), "type": edge[0].get("type", [""])[0]}} 
+        for edge in pattern["edges"]
+    ]
+    traversal = roundrobin(nodes, edges)
+    transformers = []
+    import ipdb; ipdb.set_trace()
+    for clause in clauses[1:]:
+        verb = clause["verb"]
+        
+        # Method not implemented yet, will have to change grammar to include over
+        obj = clause.get("object", "")
+        pattern = clause["pattern"]
+        pred_clause = clause.get("predicates", "")
+        if pred_clause:
+            to_set = []
+            delete = []
+            # Method is weird
+            method = ''
+            preds = pred_clause[0]['pred_clauses']
+            for pred in preds:
+                p = pred["predicate"]
+                if p == 'set':
+                    to_set = pred['pred_objects']
+                    for attr in to_set.asList():
+
+                elif p == 'delete':
+                    delete = pred['pred_objects'].asList()
+        #    elif p == 'method':
+        #        method = pred['pred_objects'][0]
+        transformer = {
+            verb: {
+                "method": {obj: {}} 
+            }
+        }
+        transformers.append(transformer)
+    etl = {
+        "extractor": {
+            "networkx": {
+                "class": obj,
+                "traversal": list(traversal)
+            }
+        },
+        "tansformers": transformers,
+        "loader": {
+            "networkx": {}
+        }
+    }
+    return traversal 
+
+
+def roundrobin(*iterables):
+    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    # Recipe credited to George Sakkis
+    pending = len(iterables)
+    nexts = cycle(iter(it).next for it in iterables)
+    while pending:
+        try:
+            for next in nexts:
+                yield next()
+        except StopIteration:
+            pending -= 1
+            nexts = cycle(islice(nexts, pending))

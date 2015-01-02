@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
 from itertools import chain
 import networkx as nx
-from grammar import parser
 
 
-def execute_etl(graph, etl):
+def execute_etl(etl, graph):
+    """
+    Main API function. Executes ETL on graph. 
+
+    :param etl: ETL JSON.
+    :param graph: The source graph.
+    :return graph: The projected graph.
+    """
     etl = _ETL(etl)
     # Extractor is a function that returns a Projection class.
     extractor = etl.extractor
@@ -21,32 +27,161 @@ def execute_etl(graph, etl):
     return graph
 
 
+def nx_loader(etl, projection, paths):
+    """
+    Loader for NetworkX graph.
+
+    :param etl: projx._ETL.
+    :param projection: projx.NXProjection
+    :param paths: List of lists.
+    :returns: networkx.Graph
+    """
+    if etl.subgraph == "graph":
+        graph = projection.graph
+    else:
+        graph = projection.build_subgraph(paths)   
+    if len(etl.transformers) > 1: 
+        graph = nx_transformer_pipeline(etl, projection, graph, paths)
+    elif len(etl.transformers) == 1:
+        graph = nx_transformer(etl, projection, graph, paths)
+    return graph
+
+
+def nx_transformer(etl, projection, graph, paths):
+    """
+    Static transformer for NetworkX graph. Single transformation.
+
+    :param etl: projx._ETL.
+    :param projection: projx.NXProjection
+    :param graph: networkx.Graph
+    :param paths: List of lists.
+    :returns: networkx.Graph
+    """
+    removals = set()
+    transformer = etl.transformers[0]
+    transformation = transformer.keys()[0]
+    pattern = transformer[transformation]["pattern"]
+    source, target = _get_source_target(etl, pattern)
+    to_set = transformer[transformation].get("set", [])
+    fn = projection.transformations[transformation]
+    delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+    to_delete = [etl.node_alias[alias] for alias in delete_alias]
+    method = transformer[transformation].get("method", {})
+    for path in paths:
+        source_node = path[source]
+        target_node = path[target]
+        # Extract to function
+        attrs = _get_attrs(etl, graph, to_set, path)
+        graph = fn(source_node, target_node, attrs, graph, method=method)
+        for i in to_delete:
+            removals.update([path[i]])
+    graph.remove_nodes_from(removals)
+    return graph
+
+
+def nx_transformer_pipeline(etl, projection, graph, paths):
+    """
+    Pipeline transformer for NetworkX graph. Multiple transformations.
+
+    :param etl: projx._ETL.
+    :param projection: projx.NXProjection
+    :param graph: networkx.Graph
+    :param paths: List of lists.
+    :returns: networkx.Graph
+    """
+    removals = set()
+    for path in paths:
+        for transformer in etl.transformers:
+            transformation = transformer.keys()[0]
+            pattern = transformer[transformation]["pattern"]
+            source, target = _get_source_target(etl, pattern)
+            source_node = path[source]
+            target_node = path[target]
+            to_set = transformer[transformation].get("set", [])
+            method = transformer[transformation].get("method", {})
+            attrs = _get_attrs(etl, graph, to_set, path)
+            fn = projection.transformations[transformation]
+            graph = fn(source_node, target_node, attrs, graph, method=method)
+            delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+            to_delete = [etl.node_alias[alias] for alias in delete_alias]
+        for i in to_delete:
+            removals.update([path[i]])
+    graph.remove_nodes_from(removals)
+    return graph
+
+
+def _get_attrs(etl, graph, to_set, path):
+    """
+    Helper to get attrs based on set input.
+
+    :param etl: projx._ETL.
+    :param graph: networkx.Graph
+    :param to_set: List of dictionaries.
+    :param path: List.
+    :returns: Dict.
+    """
+    attrs = {}
+    for i, attr in enumerate(to_set):
+        key = attr.get("key", i)
+        value = attr.get("value", "")
+        if not value:
+            lookup = attr.get("value_lookup", "")
+            if lookup:
+                alias, lookup_key = lookup.split(".")
+                alias_index = etl.node_alias[alias]
+                node = path[alias_index]
+                value = graph.node[node][lookup_key]
+        attrs[key] = value
+    return attrs
+
+
+def _get_source_target(etl, pattern):
+    """
+    Uses _ETL's alias system to perform a pattern match.
+
+    :param etl: projx._ETL. The initital pattern specified
+                          in "MATCH" statement or in one-line query.
+    :param pattern: List.
+    :returns: Int. Source and target list indices.
+    """
+    try:
+        alias_seq = [p["node"]["alias"] for p in pattern[0::2]]
+    except KeyError:
+        raise Exception("Please define valid transformation pattern.")
+    source = etl.node_alias[alias_seq[0]]
+    target = etl.node_alias[alias_seq[-1]]
+    return source, target
+
+
 class _ETL(object):
 
     def __init__(self, etl):
         """
         A helper class that parses the ETL JSON, and initializes the
         required extractor, transformers, and loader. Also store key
-        variable used in transformation/loading.
+        variables used in transformation/loading.
+
+        :param etl: ETL JSON.
         """
         # Get the extractor info.
         try:
             self._extractor = etl["extractor"]
             self.extractor_name = self._extractor.keys()[0]
         except (KeyError, IndexError):
-            raise Error("Please define valid extractor")
+            raise Exception("Please define valid extractor")
         # Get the loader info.
         try:
             self._loader = etl["loader"]
             self.loader_name = self._loader.keys()[0]
         except (KeyError, IndexError):
-            raise Error("Please define valid loader.")
+            raise Exception("Please define valid loader.")
 
         # Get the extractor function.
         self._extractors = {}
         self._init_extractors()
         self.extractor = self.extractors[self.extractor_name]
 
+        # Get the transformers.
         self.transformers = etl.get("transformers", [])
 
         # Get the loader function.
@@ -59,6 +194,9 @@ class _ETL(object):
     extractors = property(fget=_get_extractors)
 
     def extractors_wrapper(self, extractor):
+        """
+        :param extractor: Str.
+        """
         def wrapper(fn):
             self.extractors[extractor] = fn
         return wrapper
@@ -72,6 +210,10 @@ class _ETL(object):
         """
         @self.extractors_wrapper("networkx")
         def nx_extractor(graph):
+            """
+            :param graph: networkx.Graph
+            :returns: projx.NXProjection
+            """
             # Set all of the attrs required for NetworkX work.
             # This is the traversal pattern
             node_type_attr = self._extractor[self.extractor_name].get(
@@ -100,7 +242,7 @@ class _ETL(object):
                 edge_type_seq = [edge["edge"].get(edge_type_attr, "") 
                                  for edge in edges]
             except KeyError:
-                raise Error("Please define valid traversal sequence")
+                raise Exception("Please define valid traversal sequence")
             self.query = (node_type_seq, edge_type_seq)
             return NXProjection(graph, node_type_attr, edge_type_attr)
 
@@ -123,107 +265,6 @@ class _ETL(object):
             return nx_loader(etl, projection, paths)
     
 
-# Functions to load and transform NetworkX graph
-def nx_loader(etl, projection, paths):
-    if etl.subgraph == "graph":
-        graph = projection.copy()
-    else:
-        graph = projection.build_subgraph(paths)   
-    if len(etl.transformers) > 1: 
-        graph = nx_transformer_pipeline(etl, projection, graph, paths)
-    elif len(etl.transformers) == 1:
-        graph = nx_transformer(etl, projection, graph, paths)
-    return graph
-
-
-def nx_transformer(etl, projection, graph, paths):
-    removals = set()
-    transformer = etl.transformers[0]
-    transformation = transformer.keys()[0]
-    pattern = transformer[transformation]["pattern"]
-    source, target = _get_source_target(etl, pattern)
-    to_set = transformer[transformation].get("set", [])
-    fn = projection.operations[transformation]
-    delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
-    to_delete = [etl.node_alias[alias] for alias in delete_alias]
-    method = transformer[transformation].get("method", {})
-    for path in paths:
-        source_node = path[source]
-        target_node = path[target]
-        attrs = {}
-        for i, attr in enumerate(to_set):
-            key = attr.get("key", i)
-            value = attr.get("value", "")
-            if not value:
-                lookup = attr.get("value_lookup", "")
-                if lookup:
-                    alias, lookup_key = lookup.split(".")
-                    alias_index = etl.node_alias[alias]
-                    node = path[alias_index]
-                    value = graph.node[node][lookup_key]
-            attrs[key] = value
-        graph = fn(source_node, target_node, attrs, graph, method=method)
-        for i in to_delete:
-            removals.update([path[i]])
-    graph.remove_nodes_from(removals)
-    return graph
-
-
-def nx_transformer_pipeline(etl, projection, graph, paths):
-    """
-    Map transformation rules on paths, and then apply to graph.
-    :returns: Graph. 
-    """
-    removals = set()
-    for path in paths:
-        for transformer in etl.transformers:
-            transformation = transformer.keys()[0]
-            pattern = transformer[transformation]["pattern"]
-            source, target = _get_source_target(etl, pattern)
-            source_node = path[source]
-            target_node = path[target]
-            to_set = transformer[transformation].get("set", [])
-            method = transformer[transformation].get("method", {})
-            attrs = {}
-            for i, attr in enumerate(to_set):
-                key = attr.get("key", i)
-                value = attr.get("value", "")
-                if not value:
-                    lookup = attr.get("value_lookup", "")
-                    if lookup:
-                        alias, lookup_key = lookup.split(".")
-                        alias_index = etl.node_alias[alias]
-                        node = path[alias_index]
-                        value = graph.node[node][lookup_key]
-                attrs[key] = value
-            fn = projection.operations[transformation]
-            graph = fn(source_node, target_node, attrs, graph, method=method)
-            delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
-            to_delete = [etl.node_alias[alias] for alias in delete_alias]
-        for i in to_delete:
-            removals.update([path[i]])
-    graph.remove_nodes_from(removals)
-    return graph
-
-
-def _get_source_target(etl, pattern):
-    """
-    Uses _ETL's alias system to perform a pattern match.
-
-    :param etl: _ETL. The initital pattern specified
-                          in "MATCH" statement or in one-line query.
-    :param pattern: List.
-    :returns: Int. Source and target list indices.
-    """
-    try:
-        alias_seq = [p["node"]["alias"] for p in pattern[0::2]]
-    except KeyError:
-        raise Error("Please define valid transformation pattern.")
-    source = etl.node_alias[alias_seq[0]]
-    target = etl.node_alias[alias_seq[-1]]
-    return source, target
-
-
 class BaseProjection(object):
 
     def match(self):
@@ -238,77 +279,92 @@ class BaseProjection(object):
 class NXProjection(BaseProjection):
     def __init__(self, graph, node_type_attr="type", edge_type_attr="type"):
         """
-        Main class for generating graph projections and schema modifications.
-        Wraps a NetworkX graph, and then executes a query written in the
-        ProjX query language over the graph. ProjX queries are based on
-        Neo4j"s Cypher syntax, but are currently considerably simpler.
-        "TRANSFER" and "PROJECT" and "COMBINE".
+        Implements match, _project, _transfer, and _combine for NetworkX. 
 
-        :param graph: An multi-partite (multi-type) instance of
-            networkx.Graph().
-        :param node_type_attr: A string node attribute name that distinguishes
-            between types (modes). Default is "type".
-        :param node_type_attr: A string node attribute name that distinguishes
-            between types (modes). Default is "type".
+        :param graph: networkx.Graph(). An multi-partite (multi-type) graph.
+            .
+        :param node_type_attr: Str. Node attribute name that distinguishes
+        between types (modes). Default is "type".
+        :param edge_type_attr: Str. Edge attribute name that distinguishes
+        between types. Default is "type".
 
         """
-        # Preserve the original node in an attribute called node,
-        # then relabel the nodes with integers.
         super(NXProjection, self).__init__()
         for node in graph.nodes():
+            # Used in traversal.
             graph.node[node]["visited_from"] = []
+            # Store original node in attr called node.
             graph.node[node]["node"] = node
         mapping = dict(zip(graph.nodes(), range(0, graph.number_of_nodes())))
+        # Change nodes to integers.
         self.graph = nx.relabel_nodes(graph, mapping)
         self.node_type_attr = node_type_attr
         self.edge_type_attr = edge_type_attr
-        self.parser = parser
-        self._operations = {}
-        self._operations_init()
+        self._transformation = {}
+        self._transformation_init()
+        self.id_counter = max(graph.nodes()) + 1
 
-    def copy(self):
-        return self.graph.copy()
-
-    def operations_wrapper(self, verb):
+    def transformation_wrapper(self, verb):
         """
-        Wraps the operations methods and adds them to the operationss dictionary for
-        easy retrivial during query parse.
+        Wraps the transformation methods and adds them to the transformations
+        dictionary.
 
-        :param verb: String. The ProjX verb assiociated with the wrapped
-            function.
+        :param verb: Str. The ProjX verb assiociated with the wrapped
+        function.
         """
         def wrapper(fn):
-            self._operations[verb] = fn
+            self._transformation[verb] = fn
         return wrapper
 
-    def _get_operations(self):
+    def _get_transformation(self):
         """
-        Return operations for operationss property.
+        Return transformation for transformation property.
 
-        :returns: Dict. A dict containing a mapping of verbs to operations
+        :returns: Dict. A dict containing a mapping of verbs to transformation
             methods.
         """
-        return self._operations
-    operations = property(fget=_get_operations)
+        return self._transformation
+    transformations = property(fget=_get_transformation)
 
-    def _operations_init(self):
+    def _transformation_init(self):
         """
-        A series of functions representing the grammar operationss. These are
-        wrapped by the operationss wrapper and added to the operationss dict.
+        A series of functions representing transformations. These are
+        wrapped by the transformation wrapper and added to the transformations dict.
         Later during the parsing and execution phase these are called as
         pointers to the various graph transformation methods
         (transfer and project).
         """
-        @self.operations_wrapper("project")
+        @self.transformation_wrapper("project")
         def execute_project(source, target, attrs, graph, **kwargs):
+            """
+            :param source: Int. Source node for transformation.
+            :param target: Int. Target node for transformation.
+            :param attrs: Dict. Attrs to be set during transformation.
+            :param graph: networkx.Graph. Graph of subgraph to transform.
+            :returns: function. 
+            """
             return self._project(source, target, attrs, graph, **kwargs)
 
-        @self.operations_wrapper("transfer")
+        @self.transformation_wrapper("transfer")
         def execute_transfer(source, target, attrs, graph, **kwargs):
+            """
+            :param source: Int. Source node for transformation.
+            :param target: Int. Target node for transformation.
+            :param attrs: Dict. Attrs to be set during transformation.
+            :param graph: networkx.Graph. Graph of subgraph to transform.
+            :returns: function.
+            """
             return self._transfer(source, target, attrs, graph, **kwargs)
 
-        @self.operations_wrapper("combine")
+        @self.transformation_wrapper("combine")
         def execute_combine(source, target, attrs, graph, **kwargs):
+            """
+            :param source: Int. Source node for transformation.
+            :param target: Int. Target node for transformation.
+            :param attrs: Dict. Attrs to be set during transformation.
+            :param graph: networkx.Graph. Graph of subgraph to transform.
+            :returns: function.
+            """
             return self._combine(source, target, attrs, graph, **kwargs)
 
     def _clear(self, nbunch):
@@ -324,7 +380,8 @@ class NXProjection(BaseProjection):
         """
         Executes traversals to perform initial match on pattern.
 
-        :param pattern: String. A valid pattern string.
+        :param query: List/Tuple of two lists. First list contains the node
+        type sequence. Second list contains edge type sequence. 
         :returns: List of lists. The matched paths.
         """
         node_type_seq, edge_type_seq = query
@@ -337,40 +394,27 @@ class NXProjection(BaseProjection):
         paths = list(chain.from_iterable(path_list))
         return paths
 
-    def project(self, mp):
-        """
-        Performs match, executes _project, and returns graph. This can be
-        part of programmatic API.
-
-        :param mp: _MatchPattern. The initital pattern specified
-                              in "MATCH" statement or in one-line query.
-        :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
-
-        """
-        pass
-
     def _project(self, source, target, attrs, graph, **kwargs):
         """
         Executes graph "PROJECT" projection.
 
+        :param source: Int. Source node for transformation.
+        :param target: Int. Target node for transformation.
+        :param attrs: Dict. Attrs to be set during transformation.
+        :param graph: networkx.Graph. Graph of subgraph to transform.
         :returns: networkx.Graph. A projected copy of the wrapped graph
                   or its subgraph.
         """
-
-
-        # Ugly
+        algorithm = ""
+        over = []
         method = kwargs.get("method", "")
         if method:
             try:
-                algo = method.keys()[0]
-                over = method[algo].get("over", [])
+                algorithm = method.keys()[0]
+                over = method[algorithm].get("over", [])
             except IndexError:
-                raise Error("Please define edge weight calculation method.")
-        else:
-            algo = ""
-            over = []
-        if algo == "jaccard" or not algo:
+                raise Exception("Please define edge weight calculation method.")
+        if algorithm == "jaccard":
             snbrs = {node for node  in graph[source].keys()
                      if graph.node[node][self.node_type_attr] in over}
             tnbrs = {node for node in graph[target].keys()
@@ -381,8 +425,8 @@ class NXProjection(BaseProjection):
             attrs["weight"] = jaccard
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
-            merged_attrs = self._merge_attrs(attrs, edge_attrs, 
-                                             self.node_type_attr)
+            merged_attrs = _merge_attrs(attrs, edge_attrs, 
+                                             [self.node_type_attr])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
         else:
@@ -393,100 +437,63 @@ class NXProjection(BaseProjection):
         """
         Execute a graph "TRANSFER" projection.
 
+        :param source: Int. Source node for transformation.
+        :param target: Int. Target node for transformation.
+        :param attrs: Dict. Attrs to be set during transformation.
+        :param graph: networkx.Graph. Graph of subgraph to transform.
         :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
+        or its subgraph.
         """
+        algorithm = ""
         method = kwargs.get("method", "")
         if method:
             try:
-                algo = method.keys()[0]
+                algorithm = method.keys()[0]
             except IndexError:
-                raise Error("Please define a valid method.")  
-        else:
-            algo = ''         
-        if algo == "edges" or not algo:
+                raise Exception("Please define a valid method.")           
+        if algorithm == "edges" or not algorithm:
             nbrs = graph[source]
-            new_edges = zip(
-                [target] * len(nbrs),
-                nbrs,
-                [v for (k, v) in nbrs.items()]
-            )
-        if algo == "attrs" or not algo:
+            edges = zip([target] * len(nbrs), nbrs,
+                        [v for (k, v) in nbrs.items()])
+        if algorithm == "attrs" or not algorithm:
             old_attrs = graph.node[target]
-            merged_attrs = self._merge_attrs(attrs, old_attrs,
-                                             self.node_type_attr)
+            merged_attrs = _merge_attrs(attrs, old_attrs,
+                                             [self.node_type_attr])
             graph.node[target] = merged_attrs
-        graph = self.add_edges_from(graph, new_edges)
+        graph = self.add_edges_from(graph, edges)
         return graph
 
-    def _combine(self, graph, paths, mp, pattern, obj=None, pred_clause=None):
+    def _combine(self, source, target, attrs, graph, **kwargs):
 
         """
-        Executes graph "COMBINE" projection. Ooofs.
+        Executes graph "COMBINE" projection.
 
-        :param graph: networkx.Graph. A copy of the wrapped grap or its
-                      subgraph.
-        :param path: List of lists. The paths matched
-                     by the _match method based.
-        :param mp: _MatchPattern. The initital pattern specified
-                              in "MATCH" statement or in one-line query.
-        :param pattern: Optional. String. A valid pattern string. Needed for
-                        multi-line query.
+        :param source: Int. Source node for transformation.
+        :param target: Int. Target node for transformation.
+        :param attrs: Dict. Attrs to be set during transformation.
+        :param graph: networkx.Graph. Graph of subgraph to transform.
         :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
+        or its subgraph.
         """
-        id_counter = max(graph.nodes()) + 1
-        removals = set()
-        delete = []
-        to_set = ''
-        node_ids = {}
-        new_edges = []
-        if pred_clause:
-            to_set, delete, method = _process_predicate(pred_clause, mp)
-        source, target = _get_source_target(paths, mp, pattern)
-        null_types = [mp.node_type_seq[i] for i in delete]
-        for path in paths:
-            source_node = path[source]
-            target_node = path[target]
-            node_id = node_ids.get(target_node, "")        
-            for i in delete:
-                removals.update([path[i]])
-            # Set attrs.
-            if node_id:
-                attrs = graph.node[node_id]
-            else:
-                attrs = {}
-            if to_set:
-                new_attrs = _transfer_attrs(attrs, to_set, mp,
-                                            path, graph, self.node_type)
-            # Set up a combo type if not specified.
-            if not new_attrs.get(self.node_type, ""):
-                new_attrs[self.node_type] = '{0}_{1}'.format(
-                    graph.node[source_node][self.node_type],
-                    graph.node[target_node][self.node_type]
-                )
-            # Create nodes.
-            if node_id:
-                graph.node[node_id] = new_attrs
-            else:
-                node_ids[target_node] = id_counter
-                new_node = id_counter
-                graph.add_node(new_node, new_attrs)
-                id_counter += 1
-            # Build edges.
-            nbrs = dict(graph[source_node]) # Copy
-            nbrs.update(dict(graph[target_node]))
-            # Have to check speed here with a bigger graph.
-            nbrs = {k: v for (k, v) in nbrs.items() 
-                    if graph.node[k][self.node_type] not in null_types}
-            new_edges += zip(
-                [new_node] * len(nbrs),
-                nbrs,
-                [v for (k, v) in nbrs.items()]
+        node_type = attrs.get(self.node_type_attr, "")
+        if not node_type:
+            node_type = '{0}_{1}'.format(
+                graph.node[source][self.node_type_attr],
+                graph.node[target][self.node_type_attr]
             )
-        graph = self.add_edges_from(graph, new_edges)
-        graph.remove_nodes_from(removals)
-        return graph, paths
+            attrs[self.node_type_attr] = node_type
+        new_node = int(self.id_counter)
+        graph.add_node(new_node, attrs)
+        self.id_counter += 1
+        nbrs = dict(graph[source])
+        nbrs.update(dict(graph[target]))
+        # Filter out newly created nodes from neighbors.
+        nbrs = {k: v for (k, v) in nbrs.items() 
+                if graph.node[k][self.node_type_attr] != node_type}
+        edges = zip([new_node] * len(nbrs), nbrs,
+                        [v for (k, v) in nbrs.items()])
+        graph = self.add_edges_from(graph, edges)
+        return graph
 
     def traverse(self, start, node_type_seq, edge_type_seq):
         """
@@ -572,10 +579,9 @@ class NXProjection(BaseProjection):
 
     def build_subgraph(self, paths):
         """
-        Takes the paths returned by _match and builds a graph.
-        :param paths: List of lists. The paths matched
-                      by the _match method based.
-        :returns: networkx.Graph. A subgraph of the wrapped graph.
+        Takes the paths returned by match and builds a graph.
+        :param paths: List of lists.
+        :returns: networkx.Graph. Matched sugraph.
         """
         g = nx.Graph()
         for path in paths:
@@ -587,15 +593,19 @@ class NXProjection(BaseProjection):
             g.node[node] = dict(self.graph.node[node])
         return g
 
-    def add_edges_from(self, graph, new_edges):
+    def add_edges_from(self, graph, edges):
         """
         An alternative to the networkx.Graph.add_edges_from.
         Handles non-reserved attributes as sets.
+
+        :param graph: networkx.Graph 
+        :param edges: List of tuples. Tuple contains two node ids Int and an
+        attr Dict.
         """
-        for source, target, attrs in new_edges:
+        for source, target, attrs in edges:
             if graph.has_edge(source, target):
                 edge_attrs = graph[source][target]
-                merged_attrs = self._merge_attrs(
+                merged_attrs = _merge_attrs(
                     attrs,
                     edge_attrs,
                     [self.edge_type_attr, "weight"]
@@ -606,20 +616,29 @@ class NXProjection(BaseProjection):
                 graph.add_edge(source, target, attrs)
         return graph
 
-    def _merge_attrs(self, new_attrs, old_attrs, reserved=[]):
-        attrs = {}
-        attrs.update(dict(old_attrs))
-        for k, v in new_attrs.items():
-            if k in reserved:
-                attrs[k] = v
-            elif k not in attrs:
-                attrs[k] = set([v])
-            else:
-                val = attrs[k]
-                if not isinstance(val, set):
-                    attrs[k] = set([val])
-                attrs[k].update([v])
-        return attrs
+
+def _merge_attrs(new_attrs, old_attrs, reserved=[]):
+    """
+    Merges dicts handling repeated values as mulitvalued attrs using sets.
+
+    :param new_attrs: Dict.
+    :param old_attrs: Dict.
+    :reserved: List. A list of attributes that cannot have more than value.
+    :returns: Dict.
+    """
+    attrs = {}
+    attrs.update(dict(old_attrs))
+    for k, v in new_attrs.items():
+        if k in reserved:
+            attrs[k] = v
+        elif k not in attrs:
+            attrs[k] = set([v])
+        else:
+            val = attrs[k]
+            if not isinstance(val, set):
+                attrs[k] = set([val])
+            attrs[k].update([v])
+    return attrs
 
 
 def _combine_paths(path):
@@ -632,5 +651,3 @@ def _combine_paths(path):
     for i, node in enumerate(path[1:]):
         edges.append((path[i], node))
     return edges
-
-

@@ -121,6 +121,57 @@ transfer_etl = {
 }
 
 
+combine_etl = {
+    "extractor": {
+        "networkx": {
+            "class": "graph",
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
+            "traversal": [
+                {"node": {"type": "City", "alias": "c"}},
+                {"edge": {}},
+                {"node": {"type": "Institution", "alias": "i"}},
+            ]
+        }
+    },
+    "transformers": [
+        {
+            "combine": {
+                "pattern": [
+                    {"node": {"alias": "c"}},
+                    {"edge": {}},
+                    {"node": {"alias": "i"}}
+                ],
+                "set": [
+                    {
+                        "alias": "NEW",
+                        "key": "type",
+                        "value":"GeoInst",
+                        "value_lookup": ""
+                    },
+                    {
+                        "alias": "NEW",
+                        "key": "city_name",
+                        "value":"",
+                        "value_lookup": "c.name"
+                    },
+                    {
+                        "alias": "NEW",
+                        "key": "inst_name",
+                        "value":"",
+                        "value_lookup": "i.name"
+                    }
+                ],
+                "delete": {"alias": ["c", "i"]}
+            }
+        }
+    ],
+    "loader": {
+        "networkx": {}
+    }
+}
+
+
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['name']):
