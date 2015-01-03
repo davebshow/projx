@@ -169,7 +169,7 @@ def nx_transformer(transformers, projection, graph, paths):
     return graph
 
 
-def nx_transformer_pipeline(transfomers, projection, graph, paths):
+def nx_transformer_pipeline(transformers, projection, graph, paths):
     """
     Pipeline transformer for NetworkX graph. Multiple transformations.
 

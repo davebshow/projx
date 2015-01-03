@@ -7,12 +7,23 @@ from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group,
 # Used throughout as a variable/attr name.
 var = Word(alphanums, "_" + alphanums)
 
-# MATCH STATEMENT
+############### MATCH STATEMENT ######################
+
 match = CaselessKeyword("MATCH")
 graph = CaselessKeyword("GRAPH") | CaselessKeyword("SUBGRAPH")
 graph.setParseAction(lambda t: t[0].lower())
 
+################ Transformations #######################
+
+transformation = (
+    CaselessKeyword("TRANSFER") |
+    CaselessKeyword("PROJECT") |
+    CaselessKeyword("COMBINE") 
+)
+transformation.setParseAction(lambda t: t[0].lower())
+
 ################ NODE AND EDGE PATTERNS ###################
+
 # Used for node and edge patterns.
 seperator = Suppress(Literal(":"))
 tp = seperator + Word(alphanums, "_" + alphanums)
@@ -35,21 +46,11 @@ edge_content = (
 
 edge = edge_marker + Optional(edge_content + edge_marker)
 
-# Recursive pattern match.
+# Match/Transformation pattern.
 pattern = Forward() 
 pattern << node.setResultsName("nodes", listAllMatches=True) + ZeroOrMore(
         edge.setResultsName("edges", listAllMatches=True) + pattern
 )  
-
-################ Transformations #######################
-
-transformation = (
-    CaselessKeyword("TRANSFER") |
-    CaselessKeyword("PROJECT") |
-    CaselessKeyword("COMBINE") 
-)
-transformation.setParseAction(lambda t: t[0].lower())
-
 
 ################### PREDICATE CLAUSES #######################
 
@@ -78,17 +79,17 @@ pred_pattern << gttr_sttr.setResultsName("pattern", listAllMatches=True) + ZeroO
     Suppress(Literal(",")) + pred_pattern
 )
 
-# DELETE
+################# DELETE #####################
 delete = CaselessKeyword("DELETE")
 delete.setParseAction(lambda t: t[0].lower())
 delete_clause = delete("predicate") + csv_pattern
 
-# SET
+################## SET ########################
 setter = CaselessKeyword("SET")
 setter.setParseAction(lambda t: t[0].lower())
 set_clause = setter("predicate") + pred_pattern
 
-# METHOD
+################# METHOD ######################
 method = CaselessKeyword("METHOD")
 obj = (
     CaselessKeyword("ATTRS").setParseAction(lambda t: t[0].lower()) |
@@ -104,7 +105,6 @@ predicate_clause = (
     Optional(delete_clause("delete")) & Optional(set_clause("set")) & 
     Optional(method_clause("method"))
 )
-
 
 ###################### QUERY ###########################
 match_clause = match("match") + Optional(graph("graph")) + pattern("match_pattern")
@@ -159,10 +159,8 @@ def parse_transformation(transformation):
     algorithm = "none"
     trans = transformation["transformation"]
     trans_pattern = transformation["transform_pattern"]
-    trans_nodes = [{"node": node.asDict()} 
-                    for node in trans_pattern["nodes"]]
-    trans_edges = [{"edge": edge.asDict()}
-                    for edge in trans_pattern["edges"]]
+    trans_nodes = [{"node": node.asDict()} for node in trans_pattern["nodes"]]
+    trans_edges = [{"edge": edge.asDict()}for edge in trans_pattern["edges"]]
     setter = transformation.get("set", "")
     if setter:
         to_set = [s.asDict() for s in setter["pattern"]]

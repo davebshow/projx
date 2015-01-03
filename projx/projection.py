@@ -193,11 +193,11 @@ class NXProjection(BaseProjection):
                 algorithm = method.keys()[0]
             except IndexError:
                 raise Exception("Please define a valid method.")           
-        if algorithm == "edges" or not algorithm:
+        if algorithm == "edges" or algorithm == "none":
             nbrs = graph[source]
             edges = zip([target] * len(nbrs), nbrs,
                         [v for (k, v) in nbrs.items()])
-        if algorithm == "attrs" or not algorithm:
+        if algorithm == "attrs" or algorithm == "none":
             old_attrs = graph.node[target]
             merged_attrs = _merge_attrs(attrs, old_attrs,
                                         [self.node_type_attr])

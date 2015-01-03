@@ -12,24 +12,57 @@ class Connection(object):
 
     def __init__(self, graph):
         self.graph = graph
-        self._cursor = Cursor(self.graph)
+        self._cursor = None
 
     def cursor(self):
-        return self._cursor
+        cursor = Cursor(self)
+        self._cursor = cursor
+        return cursor
 
     def commit(self):
-        self.graph = self._cursor.graph
+        try:
+            self.graph = self._cursor._pending
+        except AttributeError:
+            raise Exception("Nothing to commit")
 
     def rollback(self):
-        self._cursor.graph = self.graph
+        try:
+            self._cursor._pending = None
+        except AttributeError:
+            raise Exception("Nothing to rollback")
+
+    def _reset_cursor(self):
+        self._cursor = None
+
+    def close(self):
+        self.graph = None
+        self._cursor = None
+
+    def __del__(self):
+        self.close()
 
 
 class Cursor(object):
 
-    def __init__(self, graph):
-        self.graph = graph
+    def __init__(self, connection):
+        self.connection = connection
+        self._pending = None
+
+    def _get_pending(self):
+        return self._pending
+    pending = property(fget=_get_pending)
 
     def execute(self, query):
-        etl = parse_query(query)    
-        self.graph = execute_etl(etl, self.graph)
-        return self.graph
+        try:
+            etl = parse_query(query)    
+            self._pending = execute_etl(etl, self.connection.graph)
+        except AttributeError:
+            raise Exception("Cursor has been closed.")
+        return self._pending
+
+    def close(self):
+        self._pending = None
+        self.connection._reset_cursor()
+
+    def __del__(self):
+        self.close()
