@@ -136,11 +136,11 @@ def parse_query(query):
     etl = {
         "extractor": {
             "networkx": {
-                "type": prsd["graph"],
+                "type": prsd.get("graph", "subgraph"),
                 "traversal": list(roundrobin(nodes, edges))
             }
         },
-        "tansformers": parse_transformations(transformations),
+        "transformers": map(parse_transformation, transformations),
         "loader": {
             "networkx": {}
         }
@@ -148,43 +148,41 @@ def parse_query(query):
     return etl 
 
 
-def parse_transformations(transformations):
+def parse_transformation(transformation):
     """
     :param transformations: List. Parser output.
     :returns: List of dicts. Transformers.
     """
-    transformers = []
-    for transformation in transformations:
-        trans = transformation["transformation"]
-        trans_pattern = transformation["transform_pattern"]
-        trans_nodes = [{"node": node.asDict()} 
-                       for node in trans_pattern["nodes"]]
-        trans_edges = [{"edge": edge.asDict()}
-                       for edge in trans_pattern["edges"]]
-        setter = transformation.get("set", "")
-        if setter:
-            to_set = [s.asDict() for s in setter["pattern"]]
-        delete = transformation.get("delete", "")
-        if delete:
-            to_delete = delete["pattern"].asList()
-        method = transformation.get("method", "")
-        over = {}
-        if method:
-            algorithm = method["algo"]
-            if algorithm == "jaccard":
-                over = method["over"].asList()
-        else:
-            algorithm = "none"
-        transformer = {
-            trans: {
-                "method": {algorithm: {"over": over}},
-                "pattern": list(roundrobin(trans_nodes, trans_edges)),
-                "set": to_set,
-                "delete": {"alias": to_delete}
-            }
+    to_set = []
+    to_delete = []
+    over = {}
+    algorithm = "none"
+    trans = transformation["transformation"]
+    trans_pattern = transformation["transform_pattern"]
+    trans_nodes = [{"node": node.asDict()} 
+                    for node in trans_pattern["nodes"]]
+    trans_edges = [{"edge": edge.asDict()}
+                    for edge in trans_pattern["edges"]]
+    setter = transformation.get("set", "")
+    if setter:
+        to_set = [s.asDict() for s in setter["pattern"]]
+    delete = transformation.get("delete", "")
+    if delete:
+        to_delete = delete["pattern"].asList()
+    method = transformation.get("method", "")
+    if method:
+        algorithm = method["algo"]
+        if algorithm == "jaccard":
+            over = method["over"].asList()
+    transformer = {
+        trans: {
+            "method": {algorithm: {"over": over}},
+            "pattern": list(roundrobin(trans_nodes, trans_edges)),
+            "set": to_set,
+            "delete": {"alias": to_delete}
         }
-        transformers.append(transformer)
-    return transformers
+    }
+    return transformer
 
 
 def roundrobin(*iterables):

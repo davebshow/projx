@@ -1,6 +1,38 @@
 # -*- coding: utf-8 -*-
 from itertools import chain
 import networkx as nx
+from grammar import parse_query
+
+
+def connect(g):
+    return Connection(g)
+
+
+class Connection(object):
+
+    def __init__(self, graph):
+        self.graph = graph
+        self._cursor = Cursor(self.graph)
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.graph = self._cursor.graph
+
+    def rollback(self):
+        self._cursor.graph = self.graph
+
+
+class Cursor(object):
+
+    def __init__(self, graph):
+        self.graph = graph
+
+    def execute(self, query):
+        etl = parse_query(query)    
+        self.graph = execute_etl(etl, self.graph)
+        return self.graph
 
 
 def execute_etl(etl, graph):
@@ -60,14 +92,15 @@ def nx_transformer(etl, projection, graph, paths):
     """
     removals = set()
     transformer = etl.transformers[0]
-    transformation = transformer.keys()[0]
-    pattern = transformer[transformation]["pattern"]
+    trans_kwrd = transformer.keys()[0]
+    trans = tranformer[trans_kwrd]
+    pattern = trans["pattern"]
     source, target = _get_source_target(etl, pattern)
-    to_set = transformer[transformation].get("set", [])
-    fn = projection.transformations[transformation]
-    delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+    to_set = trans.get("set", [])
+    fn = projection.transformations[trans_kwrd]
+    delete_alias = trans.get("delete", {}).get("alias", [])
     to_delete = [etl.node_alias[alias] for alias in delete_alias]
-    method = transformer[transformation].get("method", {})
+    method = trans.get("method", {})
     for path in paths:
         source_node = path[source]
         target_node = path[target]
@@ -93,17 +126,18 @@ def nx_transformer_pipeline(etl, projection, graph, paths):
     removals = set()
     for path in paths:
         for transformer in etl.transformers:
-            transformation = transformer.keys()[0]
-            pattern = transformer[transformation]["pattern"]
+            trans_kwrd = transformer.keys()[0]
+            trans = transformer[trans_kwrd]
+            pattern = trans["pattern"]
             source, target = _get_source_target(etl, pattern)
             source_node = path[source]
             target_node = path[target]
-            to_set = transformer[transformation].get("set", [])
-            method = transformer[transformation].get("method", {})
+            to_set = trans.get("set", [])
+            method = trans.get("method", {})
             attrs = _get_attrs(etl, graph, to_set, path)
-            fn = projection.transformations[transformation]
+            fn = projection.transformations[trans_kwrd]
             graph = fn(source_node, target_node, attrs, graph, method=method)
-            delete_alias = transformer[transformation].get("delete", {}).get("alias", [])
+            delete_alias = trans.get("delete", {}).get("alias", [])
             to_delete = [etl.node_alias[alias] for alias in delete_alias]
         for i in to_delete:
             removals.update([path[i]])
