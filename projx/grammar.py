@@ -6,7 +6,6 @@ from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group,
 
 # Used throughout as a variable/attr name.
 var = Word(alphanums, "_" + alphanums)
-dot_op = Suppress(Literal("."))
 
 # MATCH STATEMENT
 match = CaselessKeyword("MATCH")
@@ -59,18 +58,19 @@ transformation.setParseAction(lambda t: t[0].lower())
 new = CaselessKeyword("NEW")
 new.setParseAction(lambda t: t[0].lower())
 
+# Comma seperated argument pattern
 csv_pattern = Forward()
 csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
      Suppress(Literal(",")) + csv_pattern
 )
 
-# Getter Setter Patterns.
+# Getter/Setter Pattern.
 left = new | var
 attr = var + Literal(".") + var
 right = attr("value_lookup") | quotedString("value")
 
 gttr_sttr = (
-    left("alias") + dot_op + var("key") + 
+    left("alias") + Suppress(Literal(".")) + var("key") + 
     Suppress(Literal("=")) + right
 )
 
@@ -92,16 +92,17 @@ set_clause = setter("predicate") + pred_pattern
 # METHOD
 method = CaselessKeyword("METHOD")
 
-algorithm = (
+obj = (
     CaselessKeyword("ATTRS").setParseAction(lambda t: t[0].lower()) |
     CaselessKeyword("EDGES").setParseAction(lambda t: t[0].lower()) |
-    CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower())
 )
 
-#CaselessKeyword("OVER").setParseAction(lambda t: t[0].lower()) + 
-#csv_pattern
+algorithm = CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower())
+over = CaselessKeyword("OVER").setParseAction(lambda t: t[0].lower())
 
-method_clause = method("predicate") + algorithm("pattern")
+projection_clause = algorithm("algo") + over("over")
+ 
+method_clause = method("predicate") + (obj | projection_clause)("pattern")
 
 predicate = (
     Optional(delete_clause("delete")) & Optional(set_clause("set")) & 
@@ -110,10 +111,8 @@ predicate = (
 
 
 ###################### QUERY ###########################
-# Valid query clause.
+
 clause = (
-    # Something more like this. Create simpler dicts, not so
-    # many groups.
     match("match") + Optional(graph("graph")) + pattern("match_pattern") +
     ZeroOrMore(
         transformation("transformation") + pattern("transform_pattern") +
@@ -121,7 +120,7 @@ clause = (
     ).setResultsName("transformations", listAllMatches=True)
 )
 
-parser = OneOrMore(clause) + stringEnd
+parser = clause + stringEnd
 
 def parse_query(query):
     """
