@@ -1,7 +1,7 @@
 from itertools import cycle, islice
 from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group, 
                        stringEnd, Suppress, Literal, CaselessKeyword,
-                       Optional, Forward, quotedString, Dict, nestedExpr)
+                       Optional, Forward, quotedString, removeQuotes)
 
 
 # Used throughout as a variable/attr name.
@@ -9,7 +9,6 @@ var = Word(alphanums, "_" + alphanums)
 
 # MATCH STATEMENT
 match = CaselessKeyword("MATCH")
-
 graph = CaselessKeyword("GRAPH") | CaselessKeyword("SUBGRAPH")
 graph.setParseAction(lambda t: t[0].lower())
 
@@ -66,8 +65,8 @@ csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
 
 # Getter/Setter Pattern.
 left = new | var
-attr = var + Literal(".") + var
-right = attr("value_lookup") | quotedString("value")
+attr = Word(alphanums, "." + alphanums)
+right = attr("value_lookup") | quotedString("value").setParseAction(removeQuotes)
 
 gttr_sttr = (
     left("alias") + Suppress(Literal(".")) + var("key") + 
@@ -91,46 +90,69 @@ set_clause = setter("predicate") + pred_pattern
 
 # METHOD
 method = CaselessKeyword("METHOD")
-
 obj = (
     CaselessKeyword("ATTRS").setParseAction(lambda t: t[0].lower()) |
-    CaselessKeyword("EDGES").setParseAction(lambda t: t[0].lower()) |
+    CaselessKeyword("EDGES").setParseAction(lambda t: t[0].lower())
 )
-
 algorithm = CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower())
 over = CaselessKeyword("OVER").setParseAction(lambda t: t[0].lower())
-
-projection_clause = algorithm("algo") + over("over")
- 
+projection_clause = algorithm("algo") + over + csv_pattern("over")  
 method_clause = method("predicate") + (obj | projection_clause)("pattern")
 
-predicate = (
+# Allows for one use of each predicate verb.
+predicate_clause = (
     Optional(delete_clause("delete")) & Optional(set_clause("set")) & 
     Optional(method_clause("method"))
 )
 
 
 ###################### QUERY ###########################
+match_clause = match("match") + Optional(graph("graph")) + pattern("match_pattern")
 
-clause = (
-    match("match") + Optional(graph("graph")) + pattern("match_pattern") +
-    ZeroOrMore(
-        transformation("transformation") + pattern("transform_pattern") +
-        Optional(predicate),
-    ).setResultsName("transformations", listAllMatches=True)
+transformation_clause = (
+    transformation("transformation") + pattern("transform_pattern") + 
+    Optional(predicate_clause)
 )
 
-parser = clause + stringEnd
+transform_pattern = Forward()
+transform_pattern << transformation_clause.setResultsName(
+    "transformations", listAllMatches=True) + ZeroOrMore(transform_pattern)
+
+parser = match_clause + Optional(transform_pattern) + stringEnd
+
 
 def parse_query(query):
     """
+    Parses grammar output to ETL JSON.
+
+    :param query: Str. DSL query.
+    :returns: JSON. ETL JSON.
     """
-    import ipdb; ipdb.set_trace()
     prsd = parser.parseString(query)
     match_pattern = prsd["match_pattern"]
     nodes = [{"node": node.asDict()} for node in match_pattern["nodes"]]
     edges = [{"edge": edge.asDict()} for edge in match_pattern["edges"]]
     transformations = prsd["transformations"]
+    etl = {
+        "extractor": {
+            "networkx": {
+                "type": prsd["graph"],
+                "traversal": list(roundrobin(nodes, edges))
+            }
+        },
+        "tansformers": parse_transformations(transformations),
+        "loader": {
+            "networkx": {}
+        }
+    }
+    return etl 
+
+
+def parse_transformations(transformations):
+    """
+    :param transformations: List. Parser output.
+    :returns: List of dicts. Transformers.
+    """
     transformers = []
     for transformation in transformations:
         trans = transformation["transformation"]
@@ -139,36 +161,30 @@ def parse_query(query):
                        for node in trans_pattern["nodes"]]
         trans_edges = [{"edge": edge.asDict()}
                        for edge in trans_pattern["edges"]]
+        setter = transformation.get("set", "")
+        if setter:
+            to_set = [s.asDict() for s in setter["pattern"]]
+        delete = transformation.get("delete", "")
+        if delete:
+            to_delete = delete["pattern"].asList()
         method = transformation.get("method", "")
+        over = {}
         if method:
-            algorithm = method.asDict()["pattern"]
+            algorithm = method["algo"]
             if algorithm == "jaccard":
-                pass
+                over = method["over"].asList()
         else:
-            algorithm = ""
+            algorithm = "none"
         transformer = {
             trans: {
-                "method": {algorithm: {}},
+                "method": {algorithm: {"over": over}},
                 "pattern": list(roundrobin(trans_nodes, trans_edges)),
-                "set": [],
-                "delete": {"alias": []}
+                "set": to_set,
+                "delete": {"alias": to_delete}
             }
         }
         transformers.append(transformer)
-
-    etl = {
-        "extractor": {
-            "networkx": {
-                "type": prsd["graph"],
-                "traversal": list(roundrobin(nodes, edges))
-            }
-        },
-        "tansformers": transformers,
-        "loader": {
-            "networkx": {}
-        }
-    }
-    return etl 
+    return transformers
 
 
 def roundrobin(*iterables):
