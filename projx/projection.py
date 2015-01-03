@@ -36,10 +36,11 @@ def nx_loader(etl, projection, paths):
     :param paths: List of lists.
     :returns: networkx.Graph
     """
-    if etl.subgraph == "graph":
-        graph = projection.graph
-    else:
-        graph = projection.build_subgraph(paths)   
+    # Untested
+    if etl.subgraph != "graph":
+        graph = projection.build_subgraph(paths)
+        projection.graph = graph
+    graph = projection.graph
     if len(etl.transformers) > 1: 
         graph = nx_transformer_pipeline(etl, projection, graph, paths)
     elif len(etl.transformers) == 1:
@@ -403,7 +404,7 @@ class NXProjection(BaseProjection):
         :param attrs: Dict. Attrs to be set during transformation.
         :param graph: networkx.Graph. Graph of subgraph to transform.
         :returns: networkx.Graph. A projected copy of the wrapped graph
-                  or its subgraph.
+        or its subgraph.
         """
         algorithm = ""
         over = []
@@ -426,7 +427,7 @@ class NXProjection(BaseProjection):
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
             merged_attrs = _merge_attrs(attrs, edge_attrs, 
-                                             [self.node_type_attr])
+                                        [self.node_type_attr])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
         else:
@@ -458,7 +459,7 @@ class NXProjection(BaseProjection):
         if algorithm == "attrs" or not algorithm:
             old_attrs = graph.node[target]
             merged_attrs = _merge_attrs(attrs, old_attrs,
-                                             [self.node_type_attr])
+                                        [self.node_type_attr])
             graph.node[target] = merged_attrs
         graph = self.add_edges_from(graph, edges)
         return graph
@@ -605,11 +606,8 @@ class NXProjection(BaseProjection):
         for source, target, attrs in edges:
             if graph.has_edge(source, target):
                 edge_attrs = graph[source][target]
-                merged_attrs = _merge_attrs(
-                    attrs,
-                    edge_attrs,
-                    [self.edge_type_attr, "weight"]
-                )
+                merged_attrs = _merge_attrs(attrs, edge_attrs,
+                                            [self.edge_type_attr, "weight"])
                 graph.adj[source][target] = merged_attrs
                 graph.adj[target][source] = merged_attrs
             else:
