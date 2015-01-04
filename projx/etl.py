@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import projection
 
+
 # ETL can be extended beyond NetworkX.
 def execute_etl(etl, graph):
     """
@@ -195,8 +196,8 @@ def nx_transformer_pipeline(transformers, projection, graph, paths):
             graph = fn(source_node, target_node, attrs, graph, method=method)
             delete_alias = trans.get("delete", {}).get("alias", [])
             to_delete = [projection.node_alias[alias] for alias in delete_alias]
-        for i in to_delete:
-            removals.update([path[i]])
+            for i in to_delete:
+            	removals.update([path[i]])
     graph.remove_nodes_from(removals)
     return graph
 
