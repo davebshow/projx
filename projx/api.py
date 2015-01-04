@@ -22,11 +22,11 @@ class Connection(object):
         return cursor
 
     def commit(self):
-        try:
-            self.graph = self._cursor._pending
-        except AttributeError:
+        if not getattr(self._cursor, "pending", ""):
             raise Exception("Nothing to commit")
-
+        self.graph = self._cursor.pending
+        self._cursor._pending = None
+        
     def rollback(self):
         try:
             self._cursor._pending = None

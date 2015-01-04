@@ -126,10 +126,8 @@ def nx_loader(transformers, projection, paths):
     :param paths: List of lists.
     :returns: networkx.Graph
     """
-    # Untested
     if projection.proj_type != "graph":
-        graph = projection.build_subgraph(paths)
-        projection.graph = graph
+        projection.graph = projection.build_subgraph(paths)
     graph = projection.graph
     if len(transformers) > 1: 
         graph = nx_transformer_pipeline(transformers, projection, graph, paths)
