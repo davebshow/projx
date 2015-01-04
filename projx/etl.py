@@ -45,6 +45,10 @@ class _ETL(object):
             self.extractor_name = self._extractor.keys()[0]
         except (KeyError, IndexError):
             raise Exception("Please define valid extractor")
+
+        # Get the transformers.
+        self.transformers = etl.get("transformers", [])
+
         # Get the loader info.
         try:
             self._loader = etl["loader"]
@@ -56,9 +60,6 @@ class _ETL(object):
         self._extractors = {}
         self._init_extractors()
         self.extractor = self.extractors[self.extractor_name]
-
-        # Get the transformers.
-        self.transformers = etl.get("transformers", [])
 
         # Get the loader function.
         self._loaders = {}

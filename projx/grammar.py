@@ -22,6 +22,8 @@ transformation = (
 )
 transformation.setParseAction(lambda t: t[0].lower())
 
+as_kwrd = CaselessKeyword("AS")
+as_clause = as_kwrd + var("as")
 ################ NODE AND EDGE PATTERNS ###################
 
 # Used for node and edge patterns.
@@ -54,10 +56,6 @@ pattern << node.setResultsName("nodes", listAllMatches=True) + ZeroOrMore(
 
 ################### PREDICATE CLAUSES #######################
 
-# Used for the creation of new nodes with combine or project.
-new = CaselessKeyword("NEW")
-new.setParseAction(lambda t: t[0].lower())
-
 # Comma seperated argument pattern
 csv_pattern = Forward()
 csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
@@ -65,7 +63,7 @@ csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
 )
 
 # Getter/Setter Pattern.
-left = new | var
+left = var
 attr = Word(alphanums, "." + alphanums)
 right = attr("value_lookup") | quotedString("value").setParseAction(removeQuotes)
 
@@ -94,7 +92,7 @@ method = CaselessKeyword("METHOD")
 obj = (
     CaselessKeyword("ATTRS").setParseAction(lambda t: t[0].lower()) |
     CaselessKeyword("EDGES").setParseAction(lambda t: t[0].lower())
-)
+)("algo")
 algorithm = CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower())
 over = CaselessKeyword("OVER").setParseAction(lambda t: t[0].lower())
 projection_clause = algorithm("algo") + over + csv_pattern("over")  
@@ -111,7 +109,7 @@ match_clause = match("match") + Optional(graph("graph")) + pattern("match_patter
 
 transformation_clause = (
     transformation("transformation") + pattern("transform_pattern") + 
-    Optional(predicate_clause)
+    Optional(as_clause) + Optional(predicate_clause)
 )
 
 transform_pattern = Forward()
@@ -153,21 +151,20 @@ def parse_transformation(transformation):
     :param transformations: List. Parser output.
     :returns: List of dicts. Transformers.
     """
-    to_set = []
-    to_delete = []
-    over = {}
+    over = []
     algorithm = "none"
     trans = transformation["transformation"]
     trans_pattern = transformation["transform_pattern"]
     trans_nodes = [{"node": node.asDict()} for node in trans_pattern["nodes"]]
     trans_edges = [{"edge": edge.asDict()}for edge in trans_pattern["edges"]]
-    setter = transformation.get("set", "")
-    if setter:
-        to_set = [s.asDict() for s in setter["pattern"]]
-    delete = transformation.get("delete", "")
-    if delete:
-        to_delete = delete["pattern"].asList()
+    new_alias = transformation.get("as", "")
+    setter = transformation.get("set", [])
+    delete = transformation.get("delete", [])
     method = transformation.get("method", "")
+    if setter:
+        setter = [s.asDict() for s in setter["pattern"]]
+    if delete:
+        delete = delete["pattern"].asList()
     if method:
         algorithm = method["algo"]
         if algorithm == "jaccard":
@@ -176,8 +173,9 @@ def parse_transformation(transformation):
         trans: {
             "method": {algorithm: {"over": over}},
             "pattern": list(roundrobin(trans_nodes, trans_edges)),
-            "set": to_set,
-            "delete": {"alias": to_delete}
+            "as": new_alias,
+            "set": setter,
+            "delete": {"alias": delete}
         }
     }
     return transformer

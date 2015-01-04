@@ -23,7 +23,8 @@ def test_graph():
         (9, 4, {'type': 'lives_in'}),
         (9, 10, {'type': 'works_at'}),
         (11, 3, {'type': 'lives_in'}),
-        (12, 5, {'type': 'lives_in'})
+        (12, 5, {'type': 'lives_in'}),
+        (12, 13, {'type': 'works_at'})
     ])
     g.node[1] = {'type': 'Person', 'name': 'davebshow'}
     g.node[2] = {'type': 'Institution', 'name': 'western'}
@@ -37,6 +38,7 @@ def test_graph():
     g.node[10] = {'type': 'City', 'name': 'alderon'}
     g.node[11] = {'type': 'Person', 'name': 'curly'}
     g.node[12] = {'type': 'Person', 'name': 'adam'}
+    g.node[13] = {'type': 'Institution', 'name': 'canland'}
     return g
 
 

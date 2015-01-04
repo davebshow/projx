@@ -185,6 +185,7 @@ class NXProjection(BaseProjection):
         :returns: networkx.Graph. A projected copy of the wrapped graph
         or its subgraph.
         """
+        edges = []
         algorithm = "none"
         method = kwargs.get("method", "")
         if method:
@@ -218,7 +219,7 @@ class NXProjection(BaseProjection):
         """
         node_type = attrs.get(self.node_type_attr, "")
         if not node_type:
-            node_type = '{0}_{1}'.format(
+            node_type = "{0}_{1}".format(
                 graph.node[source][self.node_type_attr],
                 graph.node[target][self.node_type_attr]
             )

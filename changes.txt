@@ -6,3 +6,4 @@ v0.1.4, 12/24/2014 -- fixed bug in MatchPattern class.
 v0.1.5, 12/31/2014 -- automatically indexing nodes with integers. implemented "COMBINE" statements. fixed bug in add_nodes_from method. changed to lowercase package name in PyPi, broken API. 
 v0.2.0, 01/03/2015 -- complete refactor. implemented ETL API.
 v0.2.2, 01/03/2015 -- minor bug fixes in api, etl.
+v0.2.3, 01/04/2015 -- added preliminary support for AS alias assignment. Simplified DB API, no close methods.
