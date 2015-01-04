@@ -60,5 +60,6 @@ class Cursor(object):
         :returns: networkx.Graph
         """
         etl = parse_query(query)    
-        self._pending = execute_etl(etl, self.graph)
-        return self._pending
+        graph = execute_etl(etl, self.graph)
+        self._pending = graph
+        return graph
