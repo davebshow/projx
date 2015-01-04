@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import exceptions
 from etl import execute_etl
 from grammar import parse_query
 
