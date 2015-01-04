@@ -31,7 +31,7 @@ class Connection(object):
         try:
             self._cursor._pending = None
         except AttributeError:
-            raise Exception("Nothing to rollback")
+            pass
 
     def _reset_cursor(self):
         self._cursor = None
