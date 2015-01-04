@@ -106,7 +106,7 @@ transfer_etl = {
                 "set": [
                     {
                         "alias": "i",
-                        "key": "name",
+                        "key": "city",
                         "value":"",
                         "value_lookup": "c.name"
                     }
@@ -172,6 +172,120 @@ combine_etl = {
 }
 
 
+multi_etl = {
+    "extractor": {
+        "networkx": {
+            "traversal": [
+                {
+                    "node": {
+                        "alias": "i",
+                        "type": "Institution"
+                    }
+                },
+                {
+                    "edge": {}
+                },
+                {
+                    "node": {
+                        "alias": "p1",
+                        "type": "Person"
+                    }
+                },
+                {
+                    "edge": {}
+                },
+                {
+                    "node": {
+                        "alias": "c",
+                        "type": "City"
+                    }
+                },
+                {
+                    "edge": {}
+                },
+                {
+                    "node": {
+                        "alias": "p2",
+                        "type": "Person"
+                    }
+                }
+            ],
+            "type": "subgraph"
+        }
+    },
+    "loader": {
+        "networkx": {}
+    },
+    "transformers": [
+        {
+            "transfer": {
+                "delete": {
+                    "alias": []
+                },
+                "method": {
+                    "none": {
+                        "over": {}
+                    }
+                },
+                "pattern": [
+                    {
+                        "node": {
+                            "alias": "i"
+                        }
+                    },
+                    {
+                        "edge": {}
+                    },
+                    {
+                        "node": {
+                            "alias": "p1"
+                        }
+                    }
+                ],
+                "set": [
+                    {
+                        "alias": "p1",
+                        "key": "inst",
+                        "value_lookup": "i.name"
+                    }
+                ]
+            }
+        },
+        {
+            "project": {
+                "delete": {
+                    "alias": [
+                        "c"
+                    ]
+                },
+                "method": {
+                    "jaccard": {
+                        "over": [
+                            "City"
+                        ]
+                    }
+                },
+                "pattern": [
+                    {
+                        "node": {
+                            "alias": "p1"
+                        }
+                    },
+                    {
+                        "edge": {}
+                    },
+                    {
+                        "node": {
+                            "alias": "p2"
+                        }
+                    }
+                ],
+                "set": []
+            }
+        }
+    ]
+}
+
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['name']):
@@ -182,7 +296,7 @@ def draw_simple_graph(graph, node_type_attr='type',
     """
     lbls = labels(graph, label_attrs=label_attrs)
     clrs = colors(graph, node_type_attr=node_type_attr)
-    pos = nx.spring_layout(graph)
+    pos = nx.spring_layout(graph, weight=None)
     if show_edge_labels:
         e_labels = edge_labels(graph, edge_label_attr=edge_label_attr)
     else:

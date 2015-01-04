@@ -19,6 +19,7 @@ class NXProjection(BaseProjection):
                  node_type_attr="type", edge_type_attr="type"):
         """
         Implements match, _project, _transfer, and _combine for NetworkX. 
+        This projection clobbers your nodes, best protect them.
 
         :param graph: networkx.Graph(). An multi-partite (multi-type) graph.
         :param node_type_attr: Str. Node attribute name that distinguishes
@@ -31,8 +32,6 @@ class NXProjection(BaseProjection):
         for node in graph.nodes():
             # Used in traversal.
             graph.node[node]["visited_from"] = []
-            # Store original node in attr called node.
-            graph.node[node]["node"] = node
         mapping = dict(zip(graph.nodes(), range(0, graph.number_of_nodes())))
         # Change nodes to integers.
         self.graph = nx.relabel_nodes(graph, mapping)
@@ -147,7 +146,7 @@ class NXProjection(BaseProjection):
         :returns: networkx.Graph. A projected copy of the wrapped graph
         or its subgraph.
         """
-        algorithm = ""
+        algorithm = "none"
         over = []
         method = kwargs.get("method", "")
         if method:
@@ -168,7 +167,7 @@ class NXProjection(BaseProjection):
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
             merged_attrs = _merge_attrs(attrs, edge_attrs, 
-                                        [self.node_type_attr])
+                                        [self.edge_type_attr, "weight"])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
         else:
@@ -186,7 +185,7 @@ class NXProjection(BaseProjection):
         :returns: networkx.Graph. A projected copy of the wrapped graph
         or its subgraph.
         """
-        algorithm = ""
+        algorithm = "none"
         method = kwargs.get("method", "")
         if method:
             try:

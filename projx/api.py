@@ -15,6 +15,8 @@ class Connection(object):
         self._cursor = None
 
     def cursor(self):
+        if not self.graph:
+            raise Exception("Connection is closed.")
         cursor = Cursor(self)
         self._cursor = cursor
         return cursor
@@ -46,6 +48,7 @@ class Cursor(object):
 
     def __init__(self, connection):
         self.connection = connection
+        self.graph = connection.graph
         self._pending = None
 
     def _get_pending(self):
@@ -53,15 +56,15 @@ class Cursor(object):
     pending = property(fget=_get_pending)
 
     def execute(self, query):
-        try:
-            etl = parse_query(query)    
-            self._pending = execute_etl(etl, self.connection.graph)
-        except AttributeError:
+        if not self.graph:
             raise Exception("Cursor has been closed.")
+        etl = parse_query(query)    
+        self._pending = execute_etl(etl, self.graph)
         return self._pending
 
     def close(self):
         self._pending = None
+        self.graph = None
         self.connection._reset_cursor()
 
     def __del__(self):

@@ -132,7 +132,7 @@ def parse_query(query):
     match_pattern = prsd["match_pattern"]
     nodes = [{"node": node.asDict()} for node in match_pattern["nodes"]]
     edges = [{"edge": edge.asDict()} for edge in match_pattern["edges"]]
-    transformations = prsd["transformations"]
+    transformations = prsd.get("transformations", [])
     etl = {
         "extractor": {
             "networkx": {

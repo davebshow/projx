@@ -2,6 +2,8 @@
 README.txt
 setup.py
 projx/__init__.py
+projx/api.py
+projx/etl.py
 projx/grammar.py
 projx/projection.py
 projx/utils.py
