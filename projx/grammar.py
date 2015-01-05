@@ -1,5 +1,5 @@
 from itertools import cycle, islice
-from pyparsing import (Word, alphanums, OneOrMore, ZeroOrMore, Group, 
+from pyparsing import (Word, alphanums, ZeroOrMore,
                        stringEnd, Suppress, Literal, CaselessKeyword,
                        Optional, Forward, quotedString, removeQuotes)
 
@@ -18,7 +18,7 @@ graph.setParseAction(lambda t: t[0].lower())
 transformation = (
     CaselessKeyword("TRANSFER") |
     CaselessKeyword("PROJECT") |
-    CaselessKeyword("COMBINE") 
+    CaselessKeyword("COMBINE")
 )
 transformation.setParseAction(lambda t: t[0].lower())
 
@@ -33,7 +33,9 @@ tp = seperator + Word(alphanums, "_" + alphanums)
 # Node type pattern.
 node_open = Suppress(Literal("("))
 node_close = Suppress(Literal(")"))
-node_content = var("alias") + Optional(tp("type").setParseAction(lambda t: t[0]))
+node_content = var("alias") + Optional(tp("type").setParseAction(
+    lambda t: t[0])
+)
 
 node = node_open + node_content + node_close
 
@@ -42,24 +44,24 @@ edge_marker = Suppress(Literal("-"))
 edge_open = Suppress(Literal("["))
 edge_close = Suppress(Literal("]"))
 edge_content = (
-    edge_open + var("alias") + 
+    edge_open + var("alias") +
     Optional(tp("type").setParseAction(lambda t: t[0])) + edge_close
 )
 
 edge = edge_marker + Optional(edge_content + edge_marker)
 
 # Match/Transformation pattern.
-pattern = Forward() 
+pattern = Forward()
 pattern << node.setResultsName("nodes", listAllMatches=True) + ZeroOrMore(
-        edge.setResultsName("edges", listAllMatches=True) + pattern
-)  
+    edge.setResultsName("edges", listAllMatches=True) + pattern
+)
 
 ################### PREDICATE CLAUSES #######################
 
 # Comma seperated argument pattern
 csv_pattern = Forward()
 csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
-     Suppress(Literal(",")) + csv_pattern
+    Suppress(Literal(",")) + csv_pattern
 )
 
 # Getter/Setter Pattern.
@@ -68,7 +70,7 @@ attr = Word(alphanums, "." + alphanums)
 right = attr("value_lookup") | quotedString("value").setParseAction(removeQuotes)
 
 gttr_sttr = (
-    left("alias") + Suppress(Literal(".")) + var("key") + 
+    left("alias") + Suppress(Literal(".")) + var("key") +
     Suppress(Literal("=")) + right
 )
 
@@ -80,12 +82,12 @@ pred_pattern << gttr_sttr.setResultsName("pattern", listAllMatches=True) + ZeroO
 ################# DELETE #####################
 delete = CaselessKeyword("DELETE")
 delete.setParseAction(lambda t: t[0].lower())
-delete_clause = delete("predicate") + csv_pattern
+delete_clause = delete + csv_pattern
 
 ################## SET ########################
 setter = CaselessKeyword("SET")
 setter.setParseAction(lambda t: t[0].lower())
-set_clause = setter("predicate") + pred_pattern
+set_clause = setter + pred_pattern
 
 ################# METHOD ######################
 method = CaselessKeyword("METHOD")
@@ -95,12 +97,12 @@ obj = (
 )("algo")
 algorithm = CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower())
 over = CaselessKeyword("OVER").setParseAction(lambda t: t[0].lower())
-projection_clause = algorithm("algo") + over + csv_pattern("over")  
-method_clause = method("predicate") + (obj | projection_clause)("pattern")
+projection_clause = algorithm("algo") + over + csv_pattern("over")
+method_clause = method + (obj | projection_clause)("pattern")
 
 # Allows for one use of each predicate verb.
 predicate_clause = (
-    Optional(delete_clause("delete")) & Optional(set_clause("set")) & 
+    Optional(delete_clause("delete")) & Optional(set_clause("set")) &
     Optional(method_clause("method"))
 )
 
@@ -108,7 +110,7 @@ predicate_clause = (
 match_clause = match("match") + Optional(graph("graph")) + pattern("match_pattern")
 
 transformation_clause = (
-    transformation("transformation") + pattern("transform_pattern") + 
+    transformation("transformation") + pattern("transform_pattern") +
     Optional(as_clause) + Optional(predicate_clause)
 )
 
@@ -143,7 +145,7 @@ def parse_query(query):
             "networkx": {}
         }
     }
-    return etl 
+    return etl
 
 
 def parse_transformation(transformation):
