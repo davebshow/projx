@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import projection
+import projector
 
 
 # ETL can be extended beyond NetworkX.
@@ -12,20 +12,20 @@ def execute_etl(etl, graph):
     :return graph: The projected graph.
     """
     etl = _ETL(etl)
-    # Extractor is a function that returns a Projection class.
+    # Extractor is a function that returns a projector class.
     extractor = etl.extractor
     # List of transformers.
     transformers = etl.transformers
     # Loader can be a class or function that contains transformer.
     loader = etl.loader
-    # Projection is a class that implements the match, _project, _transform,
+    # projector is a class that implements the match, _project, _transform,
     # and _combine methods.
-    projection = extractor(graph)
+    projector = extractor(graph)
     # Return paths or stream to be passed to loader transformer.
-    paths = projection.match()
-    # Loader should accept a transfomer list, a projection object, and the
+    paths = projector.match()
+    # Loader should accept a transfomer list, a projector object, and the
     # paths generator.
-    graph = loader(transformers, projection, paths)
+    graph = loader(transformers, projector, paths)
     return graph
 
 
@@ -83,7 +83,7 @@ class _ETL(object):
         Update extractors dict to allow for extensible extractor 
         functionality. Here we set the query attribute that will be passed to
         extractor match method. Also, each extractor function will return
-        a Projection class object that defines a match method.
+        a projector class object that defines a match method.
         """
         @self.extractors_wrapper("networkx")
         def get_nx_extractor(graph):
@@ -108,40 +108,40 @@ class _ETL(object):
         Returns a class/function that performs transformation and loads graph.
         """
         @self.loaders_wrapper("networkx")
-        def get_nx_loader(transformers, projection, paths):
+        def get_nx_loader(transformers, projector, paths):
             """
             :param tranformers: List of dicts.
-            :projection: class with base projx.BaseProjection
+            :projector: class with base projx.Baseprojector
             :param paths: List of lists.
             :returns: projx.nx_loader
             """
-            return nx_loader(transformers, projection, paths)
+            return nx_loader(transformers, projector, paths)
 
 
 # NetworkX Module.
-def nx_loader(transformers, projection, paths):
+def nx_loader(transformers, projector, paths):
     """
     Loader for NetworkX graph.
 
-    :param projection: projx.NXProjection
+    :param projector: projx.NXprojector
     :param paths: List of lists.
     :returns: networkx.Graph
     """
-    if projection.proj_type != "graph":
-        projection.graph = projection.build_subgraph(paths)
-    graph = projection.graph
+    if projector.proj_type != "graph":
+        projector.graph = projector.build_subgraph(paths)
+    graph = projector.graph
     if len(transformers) > 1: 
-        graph = nx_transformer_pipeline(transformers, projection, graph, paths)
+        graph = nx_transformer_pipeline(transformers, projector, graph, paths)
     elif len(transformers) == 1:
-        graph = nx_transformer(transformers, projection, graph, paths)
+        graph = nx_transformer(transformers, projector, graph, paths)
     return graph
 
 
-def nx_transformer(transformers, projection, graph, paths):
+def nx_transformer(transformers, projector, graph, paths):
     """
     Static transformer for NetworkX graph. Single transformation.
 
-    :param projection: projx.NXProjection
+    :param projector: projx.NXprojector
     :param graph: networkx.Graph
     :param paths: List of lists.
     :returns: networkx.Graph
@@ -151,17 +151,17 @@ def nx_transformer(transformers, projection, graph, paths):
     trans_kwrd = transformer.keys()[0]
     trans = transformer[trans_kwrd]
     pattern = trans["pattern"]
-    source, target = _get_source_target(projection.node_alias, pattern)
+    source, target = _get_source_target(projector.node_alias, pattern)
     to_set = trans.get("set", [])
-    fn = projection.transformations[trans_kwrd]
+    fn = projector.transformations[trans_kwrd]
     delete_alias = trans.get("delete", {}).get("alias", [])
-    to_delete = [projection.node_alias[alias] for alias in delete_alias]
+    to_delete = [projector.node_alias[alias] for alias in delete_alias]
     method = trans.get("method", {})
     for path in paths:
         source_node = path[source]
         target_node = path[target]
         # Extract to function
-        attrs = _get_attrs(projection.node_alias, graph, to_set, path)
+        attrs = _get_attrs(projector.node_alias, graph, to_set, path)
         graph = fn(source_node, target_node, attrs, graph, method=method)
         for i in to_delete:
             removals.update([path[i]])
@@ -169,12 +169,12 @@ def nx_transformer(transformers, projection, graph, paths):
     return graph
 
 
-def nx_transformer_pipeline(transformers, projection, graph, paths):
+def nx_transformer_pipeline(transformers, projector, graph, paths):
     """
     Pipeline transformer for NetworkX graph. Multiple transformations.
 
     :param transformers: List.
-    :param projection: projx.NXProjection
+    :param projector: projx.NXprojector
     :param graph: networkx.Graph
     :param paths: List of lists.
     :returns: networkx.Graph
@@ -185,16 +185,16 @@ def nx_transformer_pipeline(transformers, projection, graph, paths):
             trans_kwrd = transformer.keys()[0]
             trans = transformer[trans_kwrd]
             pattern = trans["pattern"]
-            source, target = _get_source_target(projection.node_alias, pattern)
+            source, target = _get_source_target(projector.node_alias, pattern)
             source_node = path[source]
             target_node = path[target]
             to_set = trans.get("set", [])
             method = trans.get("method", {})
-            attrs = _get_attrs(projection.node_alias, graph, to_set, path)
-            fn = projection.transformations[trans_kwrd]
+            attrs = _get_attrs(projector.node_alias, graph, to_set, path)
+            fn = projector.transformations[trans_kwrd]
             graph = fn(source_node, target_node, attrs, graph, method=method)
             delete_alias = trans.get("delete", {}).get("alias", [])
-            to_delete = [projection.node_alias[alias] for alias in delete_alias]
+            to_delete = [projector.node_alias[alias] for alias in delete_alias]
             for i in to_delete:
             	removals.update([path[i]])
     graph.remove_nodes_from(removals)
@@ -220,7 +220,7 @@ def nx_extractor(extractor, graph):
     except KeyError:
         raise Exception("Please define valid traversal sequence")
     query = (node_type_seq, edge_type_seq)
-    return projection.NXProjection(graph, proj_type, query, node_alias,
+    return projector.NXProjector(graph, proj_type, query, node_alias,
                                    edge_alias, node_type_attr, edge_type_attr)
 
 

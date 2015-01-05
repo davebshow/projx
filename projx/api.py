@@ -3,63 +3,31 @@ from etl import execute_etl
 from grammar import parse_query
 
 
-# DB Style API for the projx/networkx DSL.
-def connect(g):
-    return Connection(g)
+def project(g):
+    """
+    Constructor function for the Projection API.
+
+    :param graph: networkx.Graph
+    :returns: projx.Projection
+    """
+    return Projection(g)
 
 
-class Connection(object):
+class Projection(object):
 
     def __init__(self, graph):
         """
+        Main API class for the projx DSL.
+
         :param graph: networkx.Graph
         """
-        self.graph = graph
-        self._cursor = None
-
-    def cursor(self):
-        """
-        :returns: projx.Cursor
-        """
-        cursor = Cursor(self)
-        self._cursor = cursor
-        return cursor
-
-    def commit(self):
-        if not getattr(self._cursor, "pending", ""):
-            raise Warning("Nothing to commit")
-        self.graph = self._cursor.pending
-        self._cursor._pending = None
-        
-    def rollback(self):
-        if not getattr(self._cursor, "pending", ""):
-            raise Warning("Nothing to rollback")
-        self._cursor._pending = None
-
-    def _reset_cursor(self):
-        self._cursor = None
-
-
-class Cursor(object):
-
-    def __init__(self, connection):
-        self.connection = connection
-        self.graph = connection.graph
-        self._pending = None
-
-    def _get_pending(self):
-        """
-        :returns: networkx.Graph
-        """
-        return self._pending
-    pending = property(fget=_get_pending)
+        self._graph = graph
 
     def execute(self, query):
         """
+        Execute a query written in the projx DSL.
+
         :param query: Str. projx DSL query.
         :returns: networkx.Graph
         """
-        etl = parse_query(query)    
-        graph = execute_etl(etl, self.graph)
-        self._pending = graph
-        return graph
+        return execute_etl(parse_query(query), self._graph)

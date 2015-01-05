@@ -7,3 +7,4 @@ v0.1.5, 12/31/2014 -- automatically indexing nodes with integers. implemented "C
 v0.2.0, 01/03/2015 -- complete refactor. implemented ETL API.
 v0.2.2, 01/03/2015 -- minor bug fixes in api, etl.
 v0.2.3, 01/04/2015 -- added preliminary support for AS alias assignment. Simplified DB API, no close methods.
+v0.2.4, 01/04/2015 -- simplifying api.
