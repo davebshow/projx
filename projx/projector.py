@@ -8,20 +8,26 @@ class BaseProjector(object):
     def match(self):
         """
         This method should return a list of paths, or a generator,
-        or a stream containing paths. Something that can be passed 
+        or a stream containing paths. Something that can be passed
         to the transformer/loader.
         """
         raise NotImplementedError()
 
 
 class NXProjector(BaseProjector):
-    def __init__(self, graph, proj_type, query, node_alias, edge_alias,
+    def __init__(self, proj_type, query, node_alias, edge_alias,
                  node_type_attr="type", edge_type_attr="type"):
         """
-        Implements match, _project, _transfer, and _combine for NetworkX. 
-        This projection clobbers your nodes, best protect them.
+        This class holds the info and methods necessary for performing the ETL
+        actions on a networkx.Graph. It is not a wrapper, and does not store
+        the actual graph, just operates on it. Implements match, _project,
+        _transfer, and _combine.
 
-        :param graph: networkx.Graph(). An multi-partite (multi-type) graph.
+        :param proj_type:  Str.
+        :param query: List/Tuple of two lists. First list contains the node
+        type sequence. Second list contains edge type sequence.
+        :param node_alias: Dict.
+        :param edge_alias: Dict.
         :param node_type_attr: Str. Node attribute name that distinguishes
         between types (modes). Default is "type".
         :param edge_type_attr: Str. Edge attribute name that distinguishes
@@ -29,12 +35,6 @@ class NXProjector(BaseProjector):
 
         """
         super(NXProjector, self).__init__()
-        for node in graph.nodes():
-            # Used in traversal.
-            graph.node[node]["visited_from"] = []
-        mapping = dict(zip(graph.nodes(), range(0, graph.number_of_nodes())))
-        # Change nodes to integers.
-        self.graph = nx.relabel_nodes(graph, mapping)
         self.proj_type = proj_type
         self.query = query
         self.node_alias = node_alias
@@ -43,7 +43,19 @@ class NXProjector(BaseProjector):
         self.edge_type_attr = edge_type_attr
         self._transformation = {}
         self._transformation_init()
+
+    def process_graph(self, graph):
+        """
+        This projection clobbers your nodes, best protect them.
+
+        :param graph: networx.Graph
+        :returns: networkx.Graph
+        """
+        mapping = dict(zip(graph.nodes(), range(0, graph.number_of_nodes())))
+        # Change nodes to integers.
+        graph = nx.relabel_nodes(graph, mapping)
         self.id_counter = max(graph.nodes()) + 1
+        return graph
 
     def transformation_wrapper(self, verb):
         """
@@ -70,8 +82,8 @@ class NXProjector(BaseProjector):
     def _transformation_init(self):
         """
         A series of functions representing transformations. These are
-        wrapped by the transformation wrapper and added to the transformations dict.
-        Later during the parsing and execution phase these are called as
+        wrapped by the transformation wrapper and added to the transformations
+        dict. Later during the parsing and execution phase these are called as
         pointers to the various graph transformation methods
         (transfer and project).
         """
@@ -82,7 +94,7 @@ class NXProjector(BaseProjector):
             :param target: Int. Target node for transformation.
             :param attrs: Dict. Attrs to be set during transformation.
             :param graph: networkx.Graph. Graph of subgraph to transform.
-            :returns: function. 
+            :returns: function.
             """
             return self._project(source, target, attrs, graph, **kwargs)
 
@@ -108,29 +120,20 @@ class NXProjector(BaseProjector):
             """
             return self._combine(source, target, attrs, graph, **kwargs)
 
-    def _clear(self, nbunch):
-        """
-        Used to clear the visited attribute on a bunch of nodes.
-
-        :param nbunch: Iterable. A bunch of nodes.
-        """
-        for node in nbunch:
-            self.graph.node[node]["visited_from"] = []
-
-    def match(self):
+    def match(self, graph):
         """
         Executes traversals to perform initial match on pattern.
 
-        :param query: List/Tuple of two lists. First list contains the node
-        type sequence. Second list contains edge type sequence. 
+        :param graph: networkx.Graph
         :returns: List of lists. The matched paths.
         """
         node_type_seq, edge_type_seq = self.query
         start_type = node_type_seq[0]
         path_list = []
-        for node, attrs in self.graph.nodes(data=True):
+        for node, attrs in graph.nodes(data=True):
             if attrs[self.node_type_attr] == start_type or not start_type:
-                paths = self.traverse(node, node_type_seq[1:], edge_type_seq)
+                paths = self.traverse(node, node_type_seq[1:],
+                                      edge_type_seq, graph)
                 path_list.append(paths)
         paths = list(chain.from_iterable(path_list))
         return paths
@@ -154,9 +157,9 @@ class NXProjector(BaseProjector):
                 algorithm = method.keys()[0]
                 over = method[algorithm].get("over", [])
             except IndexError:
-                raise Exception("Please define edge weight calculation method.")
+                raise Exception("Define edge weight calculation method.")
         if algorithm == "jaccard":
-            snbrs = {node for node  in graph[source].keys()
+            snbrs = {node for node in graph[source].keys()
                      if graph.node[node][self.node_type_attr] in over}
             tnbrs = {node for node in graph[target].keys()
                      if graph.node[node][self.node_type_attr] in over}
@@ -166,7 +169,7 @@ class NXProjector(BaseProjector):
             attrs["weight"] = jaccard
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
-            merged_attrs = _merge_attrs(attrs, edge_attrs, 
+            merged_attrs = _merge_attrs(attrs, edge_attrs,
                                         [self.edge_type_attr, "weight"])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
@@ -192,7 +195,7 @@ class NXProjector(BaseProjector):
             try:
                 algorithm = method.keys()[0]
             except IndexError:
-                raise Exception("Please define a valid method.")           
+                raise Exception("Please define a valid method.")
         if algorithm == "edges" or algorithm == "none":
             nbrs = graph[source]
             edges = zip([target] * len(nbrs), nbrs,
@@ -230,14 +233,14 @@ class NXProjector(BaseProjector):
         nbrs = dict(graph[source])
         nbrs.update(dict(graph[target]))
         # Filter out newly created nodes from neighbors.
-        nbrs = {k: v for (k, v) in nbrs.items() 
+        nbrs = {k: v for (k, v) in nbrs.items()
                 if graph.node[k][self.node_type_attr] != node_type}
         edges = zip([new_node] * len(nbrs), nbrs,
-                        [v for (k, v) in nbrs.items()])
+                    [v for (k, v) in nbrs.items()])
         graph = self.add_edges_from(graph, edges)
         return graph
 
-    def traverse(self, start, node_type_seq, edge_type_seq):
+    def traverse(self, start, node_type_seq, edge_type_seq, graph):
         """
         This is a controlled depth, depth first traversal of a NetworkX
         graph and the core of this library. Criteria for searching depends
@@ -248,7 +251,9 @@ class NXProjector(BaseProjector):
         graph with 3 + type queries.
 
         :param start: Integer. Starting point for the traversal.
-        :param type_seq: List of strings. Derived from the match pattern.
+        :param node_type_seq: List of strings. Derived from the match pattern.
+        :param node_type_seq: List of strings. Derived from the match pattern.
+        :param graph: networkx.Graph
         :returns: List of lists. All matched paths.
         """
         # Initialize a stack to keep
@@ -260,6 +265,7 @@ class NXProjector(BaseProjector):
         # Keep track of visited nodes, later
         # the visited list will be cleared.
         visited = set()
+        visited_from = {}
         # The traversal will begin
         # at the designated start point.
         current = start
@@ -273,26 +279,27 @@ class NXProjector(BaseProjector):
         while len(stack) > 0:
             # Traverse!
             if depth < max_depth:
-                nbrs = set(self.graph[current]) - set([current])
+                nbrs = set(graph[current]) - set([current])
                 for nbr in nbrs:
-                    edge_type_attr = self.graph[current][nbr].get(
+                    edge_type_attr = graph[current][nbr].get(
                         self.edge_type_attr,
                         None
                     )
-                    attrs = self.graph.node[nbr]
+                    attrs = graph.node[nbr]
                     # Here check candidate node validity.
                     # Make sure this path hasn"t been checked already.
                     # Make sure it matches the type sequence.
                     # Make sure it"s not backtracking on same path.
                     # Kind of a nasty if, but I don"t want to
                     # make a method call.
-                    if (current not in attrs["visited_from"] and
+                    visited_from.setdefault(nbr, [])
+                    if (current not in visited_from[nbr] and
                             nbr not in stack and
                             (edge_type_attr == edge_type_seq[depth] or
                              edge_type_seq[depth] == "") and
-                            (attrs[self.node_type_attr] == node_type_seq[depth] or
-                             node_type_seq[depth] == "")):
-                        self.graph.node[nbr]["visited_from"].append(current)
+                            (attrs[self.node_type_attr] == node_type_seq[depth]
+                             or node_type_seq[depth] == "")):
+                        visited_from[nbr].append(current)
                         visited.update([nbr])
                         # Continue traversal at next depth.
                         current = nbr
@@ -316,10 +323,10 @@ class NXProjector(BaseProjector):
                 depth -= 1
         # Clear the visited attribute to prepare
         # for next start node to begin traversal.
-        self._clear(visited)
+        #self._clear(visited, graph)
         return paths
 
-    def build_subgraph(self, paths):
+    def build_subgraph(self, paths, graph):
         """
         Takes the paths returned by match and builds a graph.
         :param paths: List of lists.
@@ -329,10 +336,10 @@ class NXProjector(BaseProjector):
         for path in paths:
             combined_paths = _combine_paths(path)
             for edges in combined_paths:
-                attrs = self.graph[edges[0]][edges[1]]
+                attrs = graph[edges[0]][edges[1]]
                 g.add_edge(edges[0], edges[1], attrs)
         for node in g.nodes():
-            g.node[node] = dict(self.graph.node[node])
+            g.node[node] = dict(graph.node[node])
         return g
 
     def add_edges_from(self, graph, edges):
@@ -340,7 +347,7 @@ class NXProjector(BaseProjector):
         An alternative to the networkx.Graph.add_edges_from.
         Handles non-reserved attributes as sets.
 
-        :param graph: networkx.Graph 
+        :param graph: networkx.Graph
         :param edges: List of tuples. Tuple contains two node ids Int and an
         attr Dict.
         """

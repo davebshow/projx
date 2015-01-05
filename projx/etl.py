@@ -5,7 +5,7 @@ import projector
 # ETL can be extended beyond NetworkX.
 def execute_etl(etl, graph):
     """
-    Main API function. Executes ETL on graph. 
+    Main API function. Executes ETL on graph.
 
     :param etl: ETL JSON.
     :param graph: The source graph.
@@ -20,12 +20,10 @@ def execute_etl(etl, graph):
     loader = etl.loader
     # projector is a class that implements the match, _project, _transform,
     # and _combine methods.
-    projector = extractor(graph)
-    # Return paths or stream to be passed to loader transformer.
-    paths = projector.match()
+    projector = extractor()
     # Loader should accept a transfomer list, a projector object, and the
-    # paths generator.
-    graph = loader(transformers, projector, paths)
+    # graph.
+    graph = loader(transformers, projector, graph)
     return graph
 
 
@@ -67,7 +65,7 @@ class _ETL(object):
         self.loader = self.loaders[self.loader_name]
 
     def _get_extractors(self):
-        return self._extractors 
+        return self._extractors
     extractors = property(fget=_get_extractors)
 
     def extractors_wrapper(self, extractor):
@@ -80,21 +78,21 @@ class _ETL(object):
 
     def _init_extractors(self):
         """
-        Update extractors dict to allow for extensible extractor 
+        Update extractors dict to allow for extensible extractor
         functionality. Here we set the query attribute that will be passed to
         extractor match method. Also, each extractor function will return
         a projector class object that defines a match method.
         """
         @self.extractors_wrapper("networkx")
-        def get_nx_extractor(graph):
+        def get_nx_extractor():
             """
             :param graph: networkx.Graph
             :returns: projx.nx_extractor
             """
-            return nx_extractor(self._extractor[self.extractor_name], graph)
+            return nx_extractor(self._extractor[self.extractor_name])
 
     def _get_loader(self):
-        return self._loaders 
+        return self._loaders
     loaders = property(fget=_get_loader)
 
     def loaders_wrapper(self, loader):
@@ -108,18 +106,18 @@ class _ETL(object):
         Returns a class/function that performs transformation and loads graph.
         """
         @self.loaders_wrapper("networkx")
-        def get_nx_loader(transformers, projector, paths):
+        def get_nx_loader(transformers, projector, graph):
             """
             :param tranformers: List of dicts.
             :projector: class with base projx.Baseprojector
-            :param paths: List of lists.
+            :param graph: networkx.Graph
             :returns: projx.nx_loader
             """
-            return nx_loader(transformers, projector, paths)
+            return nx_loader(transformers, projector, graph)
 
 
 # NetworkX Module.
-def nx_loader(transformers, projector, paths):
+def nx_loader(transformers, projector, graph):
     """
     Loader for NetworkX graph.
 
@@ -127,10 +125,11 @@ def nx_loader(transformers, projector, paths):
     :param paths: List of lists.
     :returns: networkx.Graph
     """
+    graph = projector.process_graph(graph)
+    paths = projector.match(graph)
     if projector.proj_type != "graph":
-        projector.graph = projector.build_subgraph(paths)
-    graph = projector.graph
-    if len(transformers) > 1: 
+        graph = projector.build_subgraph(paths, graph)
+    if len(transformers) > 1:
         graph = nx_transformer_pipeline(transformers, projector, graph, paths)
     elif len(transformers) == 1:
         graph = nx_transformer(transformers, projector, graph, paths)
@@ -160,8 +159,7 @@ def nx_transformer(transformers, projector, graph, paths):
     for path in paths:
         source_node = path[source]
         target_node = path[target]
-        # Extract to function
-        attrs = _get_attrs(projector.node_alias, graph, to_set, path)
+        attrs = _lookup_attrs(projector.node_alias, graph, to_set, path)
         graph = fn(source_node, target_node, attrs, graph, method=method)
         for i in to_delete:
             removals.update([path[i]])
@@ -190,18 +188,18 @@ def nx_transformer_pipeline(transformers, projector, graph, paths):
             target_node = path[target]
             to_set = trans.get("set", [])
             method = trans.get("method", {})
-            attrs = _get_attrs(projector.node_alias, graph, to_set, path)
+            attrs = _lookup_attrs(projector.node_alias, graph, to_set, path)
             fn = projector.transformations[trans_kwrd]
             graph = fn(source_node, target_node, attrs, graph, method=method)
             delete_alias = trans.get("delete", {}).get("alias", [])
             to_delete = [projector.node_alias[alias] for alias in delete_alias]
             for i in to_delete:
-            	removals.update([path[i]])
+                removals.update([path[i]])
     graph.remove_nodes_from(removals)
     return graph
 
 
-def nx_extractor(extractor, graph):
+def nx_extractor(extractor):
     node_type_attr = extractor.get("node_type_attr", "type")
     edge_type_attr = extractor.get("edge_type_attr", "type")
     traversal = extractor.get("traversal", [])
@@ -209,22 +207,22 @@ def nx_extractor(extractor, graph):
     edges = traversal[1::2]
     proj_type = extractor.get("type", "subgraph")
     try:
-        node_alias = {node["node"]["alias"]: i for 
+        node_alias = {node["node"]["alias"]: i for
                       (i, node) in enumerate(nodes)}
-        edge_alias = {edge["edge"].get("alias", i): i for 
+        edge_alias = {edge["edge"].get("alias", i): i for
                       (i, edge) in enumerate(edges)}
-        node_type_seq = [node["node"].get(node_type_attr, "") 
+        node_type_seq = [node["node"].get(node_type_attr, "")
                          for node in nodes]
-        edge_type_seq = [edge["edge"].get(edge_type_attr, "") 
+        edge_type_seq = [edge["edge"].get(edge_type_attr, "")
                          for edge in edges]
     except KeyError:
         raise Exception("Please define valid traversal sequence")
     query = (node_type_seq, edge_type_seq)
-    return projector.NXProjector(graph, proj_type, query, node_alias,
-                                   edge_alias, node_type_attr, edge_type_attr)
+    return projector.NXProjector(proj_type, query, node_alias,
+                                 edge_alias, node_type_attr, edge_type_attr)
 
 
-def _get_attrs(node_alias, graph, to_set, path):
+def _lookup_attrs(node_alias, graph, to_set, path):
     """
     Helper to get attrs based on set input.
 
