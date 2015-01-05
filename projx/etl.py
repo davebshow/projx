@@ -18,12 +18,9 @@ def execute_etl(etl, graph):
     transformers = etl.transformers
     # Loader can be a class or function that contains transformer.
     loader = etl.loader
-    # projector is a class that implements the match, _project, _transform,
-    # and _combine methods.
-    projector = extractor()
     # Loader should accept a transfomer list, a projector object, and the
     # graph.
-    graph = loader(transformers, projector, graph)
+    graph = loader(extractor, transformers, graph)
     return graph
 
 
@@ -117,7 +114,7 @@ class _ETL(object):
 
 
 # NetworkX Module.
-def nx_loader(transformers, projector, graph):
+def nx_loader(extractor, transformers, graph):
     """
     Loader for NetworkX graph.
 
@@ -125,14 +122,17 @@ def nx_loader(transformers, projector, graph):
     :param paths: List of lists.
     :returns: networkx.Graph
     """
-    graph = projector.process_graph(graph)
-    paths = projector.match(graph)
-    if projector.proj_type != "graph":
-        graph = projector.build_subgraph(paths, graph)
+    # projection is a Projector class object that implements the match,
+    #_project, _transform, and _combine methods.
+    projection = extractor()
+    graph = projection.process_graph(graph)
+    paths = projection.match(graph)
+    if projection.proj_type != "graph":
+        graph = projection.build_subgraph(paths, graph)
     if len(transformers) > 1:
-        graph = nx_transformer_pipeline(transformers, projector, graph, paths)
+        graph = nx_transformer_pipeline(transformers, projection, graph, paths)
     elif len(transformers) == 1:
-        graph = nx_transformer(transformers, projector, graph, paths)
+        graph = nx_transformer(transformers, projection, graph, paths)
     return graph
 
 
