@@ -73,7 +73,7 @@ project_etl = {
                     {
                         "alias": "NEW",
                         "key": "name",
-                        "value":"",
+                        "value": "",
                         "value_lookup": "wild.name"
                     }
                 ],
@@ -291,13 +291,14 @@ multi_etl = {
     ]
 }
 
+
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['name']):
     """
     Utility function to draw a labeled, colored graph with Matplotlib.
 
-    :param graph: networkx.Graph    
+    :param graph: networkx.Graph
     """
     lbls = labels(graph, label_attrs=label_attrs)
     clrs = colors(graph, node_type_attr=node_type_attr)

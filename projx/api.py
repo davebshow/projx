@@ -3,16 +3,6 @@ from etl import execute_etl
 from grammar import parse_query
 
 
-def project(g):
-    """
-    Constructor function for the Projection API.
-
-    :param graph: networkx.Graph
-    :returns: projx.Projection
-    """
-    return Projection(g)
-
-
 class Projection(object):
 
     def __init__(self, graph):
