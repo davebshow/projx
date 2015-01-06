@@ -250,7 +250,7 @@ class NXProjector(object):
         def execute_combine(source, target, attrs, graph, node_type_attr,
                             edge_type_attr, **kwargs):
             self._id_counter += 1
-            p = partial(combine, id_counter=int(self._id_counter))
+            p = partial(combine, node_id=int(self._id_counter))
             return p(source, target, attrs, graph, node_type_attr,
                      edge_type_attr, **kwargs)
 
@@ -374,7 +374,12 @@ def combine(source, target, graph, attrs={}, node_type_attr="type",
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    new_node = kwargs["id_counter"]
+    new_node = kwargs.get("node_id", "")
+    if not new_node:
+        try:
+            new_node = max(graph.nodes())
+        except:
+            raise Exception("Please specify a kwarg 'node_id'")
     node_type = attrs.get(node_type_attr, "")
     if not node_type:
         node_type = "{0}_{1}".format(
