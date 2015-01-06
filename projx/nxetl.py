@@ -235,23 +235,23 @@ class NXProjector(object):
         (transfer and project).
         """
         @self.transformation_wrapper("project")
-        def execute_project(source, target, attrs, graph, node_type_attr,
+        def execute_project(source, target, graph, attrs, node_type_attr,
                             edge_type_attr, **kwargs):
-            return project(source, target, attrs, graph, node_type_attr,
+            return project(source, target, graph, attrs, node_type_attr,
                            edge_type_attr, **kwargs)
 
         @self.transformation_wrapper("transfer")
-        def execute_transfer(source, target, attrs, graph, node_type_attr,
+        def execute_transfer(source, target, graph, attrs, node_type_attr,
                              edge_type_attr, **kwargs):
-            return transfer(source, target, attrs, graph, node_type_attr,
+            return transfer(source, target, graph, attrs, node_type_attr,
                             edge_type_attr, **kwargs)
 
         @self.transformation_wrapper("combine")
-        def execute_combine(source, target, attrs, graph, node_type_attr,
-                            edge_type_attr, **kwargs):
+        def execute_combine(source, target, graph, attrs, node_type_attr,
+                            edge_type_attr, node_id="", **kwargs):
             self._id_counter += 1
             p = partial(combine, node_id=int(self._id_counter))
-            return p(source, target, attrs, graph, node_type_attr,
+            return p(source, target, graph, attrs, node_type_attr,
                      edge_type_attr, **kwargs)
 
 
@@ -362,7 +362,7 @@ def transfer(source, target, graph, attrs={}, node_type_attr="type",
 
 
 def combine(source, target, graph, attrs={}, node_type_attr="type",
-            edge_type_attr="type", **kwargs):
+            edge_type_attr="type", node_id="", **kwargs):
 
     """
     Executes graph "COMBINE" projection.
@@ -371,13 +371,13 @@ def combine(source, target, graph, attrs={}, node_type_attr="type",
     :param target: Int. Target node for transformation.
     :param attrs: Dict. Attrs to be set during transformation.
     :param graph: networkx.Graph. Graph of subgraph to transform.
+    :param node_id: Int. Id for new node, will autoassign, but 
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    new_node = kwargs.get("node_id", "")
-    if not new_node:
+    if not node_id:
         try:
-            new_node = max(graph.nodes())
+            node_id = max(graph.nodes())
         except:
             raise Exception("Please specify a kwarg 'node_id'")
     node_type = attrs.get(node_type_attr, "")
@@ -387,13 +387,13 @@ def combine(source, target, graph, attrs={}, node_type_attr="type",
             graph.node[target][node_type_attr]
         )
         attrs[node_type_attr] = node_type
-    graph.add_node(new_node, attrs)
+    graph.add_node(node_id, attrs)
     nbrs = dict(graph[source])
     nbrs.update(dict(graph[target]))
     # Filter out newly created nodes from neighbors.
     nbrs = {k: v for (k, v) in nbrs.items()
             if graph.node[k][node_type_attr] != node_type}
-    edges = zip([new_node] * len(nbrs), nbrs,
+    edges = zip([node_id] * len(nbrs), nbrs,
                 [v for (k, v) in nbrs.items()])
     graph = _add_edges_from(graph, edges)
     return graph
