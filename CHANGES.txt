@@ -1,0 +1,24 @@
+v0.1.0, 11/07/2014 -- alpha release.  
+
+v0.1.1, 11/10/2014 -- alpha release.  
+
+v0.1.2, 11/17/2014 -- added basic support for predicates.  
+
+v0.1.3, 12/22/2014 -- support for edge type criteria in traversals.  
+
+v0.1.4, 12/24/2014 -- fixed bug in MatchPattern class.  
+
+v0.1.5, 12/31/2014 -- automatically indexing nodes with integers. implemented "COMBINE"
+statements. fixed bug in add_nodes_from method. changed to lowercase package name in PyPi, broken API.  
+
+v0.2.0, 01/03/2015 -- complete refactor. implemented ETL API.  
+
+v0.2.2, 01/03/2015 -- minor bug fixes in api, etl.  
+
+v0.2.3, 01/04/2015 -- added preliminary support for AS alias assignment. Simplified DB API, no close methods.  
+
+v0.2.4, 01/04/2015 -- simplifying api.  
+
+v0.2.5, 01/06/2015 -- finished refactoring code base. API is finally stable...ish.  
+
+v0.2.6, 01/07/2015 -- removed AS/aliasing from DSL. Attributes are only set on TRANSFER destination or new node or edge as a result of COMBINE and PROJECT. METHOD now accepts a function (ATTRS, EDGES, JACCARD) and functions take args Type1, Type2 .... EDGES function now accepts types as args to determine valid transfers.
