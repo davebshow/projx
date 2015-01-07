@@ -45,42 +45,42 @@ def test_graph():
     return g
 
 
+
 project_etl = {
     "extractor": {
         "networkx": {
-            "class": "subgraph",
-            "node_type_attr": "type",
-            "edge_type_attr": "type",
+            "type": "subgraph", 
             "traversal": [
-                {"node": {"type": "Person", "alias": "p1"}},
-                {"edge": {}},
-                {"node": {"alias": "wild"}},
-                {"edge": {}},
-                {"node": {"type": "Person", "alias": "p2"}}
+                {"node": { "alias": "p1", "type": "Person"}}, 
+                {"edge": {}}, 
+                {"node": {"alias": "wild"}}, 
+                {"edge": {}}, 
+                {"node": {"alias": "p2", "type": "Person"}}
             ]
         }
-    },
+    }, 
     "transformers": [
         {
             "project": {
-                "method": {"jaccard": {"over": ["Institution", "City"]}},
                 "pattern": [
-                    {"node": {"alias": "p1"}},
-                    {"edge": {}},
+                    {"node": {"alias": "p1"}}, 
+                    {"edge": {}}, 
                     {"node": {"alias": "p2"}}
-                ],
+                ], 
                 "set": [
-                    {
-                        "alias": "NEW",
-                        "key": "name",
-                        "value": "",
-                        "value_lookup": "wild.name"
+                    {"key": "name", "value_lookup": "wild.name"}
+                ], 
+                "method": {
+                    "jaccard": {
+                        "args": ["Institution", "City"]
                     }
-                ],
-                "delete": {"alias": ["wild"]}
+                }, 
+                "delete": {
+                    "alias": ["wild"]
+                }
             }
         }
-    ],
+    ], 
     "loader": {
         "networkx": {}
     }
@@ -90,36 +90,48 @@ project_etl = {
 transfer_etl = {
     "extractor": {
         "networkx": {
-            "class": "graph",
-            "node_type_attr": "type",
-            "edge_type_attr": "type",
+            "type": "graph", 
             "traversal": [
-                {"node": {"type": "City", "alias": "c"}},
-                {"edge": {}},
-                {"node": {"type": "Institution", "alias": "i"}},
+                {
+                    "node": {
+                        "alias": "c", 
+                        "type": "City"
+                    }
+                }, 
+                {
+                    "edge": {}
+                }, 
+                {
+                    "node": {
+                        "alias": "i", 
+                        "type": "Institution"
+                    }
+                }
             ]
         }
-    },
+    }, 
     "transformers": [
         {
             "transfer": {
                 "pattern": [
-                    {"node": {"alias": "c"}},
-                    {"edge": {}},
+                    {"node": {"alias": "c"}}, 
+                    {"edge": {}}, 
                     {"node": {"alias": "i"}}
-                ],
+                ], 
                 "set": [
-                    {
-                        "alias": "i",
-                        "key": "city",
-                        "value":"",
-                        "value_lookup": "c.name"
+                    {"key": "city", "value_lookup": "c.name"}
+                ], 
+                "method": {
+                    "edges": {
+                        "args": ["Person"]
                     }
-                ],
-                "delete": {"alias": ["c"]}
+                }, 
+                "delete": {
+                    "alias": ["c"]
+                }
             }
         }
-    ],
+    ], 
     "loader": {
         "networkx": {}
     }
@@ -149,19 +161,16 @@ combine_etl = {
                 ],
                 "set": [
                     {
-                        "alias": "NEW",
                         "key": "type",
                         "value":"GeoInst",
                         "value_lookup": ""
                     },
                     {
-                        "alias": "NEW",
                         "key": "city_name",
                         "value":"",
                         "value_lookup": "c.name"
                     },
                     {
-                        "alias": "NEW",
                         "key": "inst_name",
                         "value":"",
                         "value_lookup": "i.name"
@@ -177,43 +186,17 @@ combine_etl = {
 }
 
 
-multi_etl = {
+multi_transform_etl = {
     "extractor": {
         "networkx": {
             "traversal": [
-                {
-                    "node": {
-                        "alias": "i",
-                        "type": "Institution"
-                    }
-                },
-                {
-                    "edge": {}
-                },
-                {
-                    "node": {
-                        "alias": "p1",
-                        "type": "Person"
-                    }
-                },
-                {
-                    "edge": {}
-                },
-                {
-                    "node": {
-                        "alias": "c",
-                        "type": "City"
-                    }
-                },
-                {
-                    "edge": {}
-                },
-                {
-                    "node": {
-                        "alias": "p2",
-                        "type": "Person"
-                    }
-                }
+                {"node": {"alias": "i", "type": "Institution"}},
+                {"edge": {}},
+                {"node": {"alias": "p1", "type": "Person"}},
+                {"edge": {}},
+                {"node": {"alias": "c", "type": "City"}},
+                {"edge": {}},
+                {"node": {"alias": "p2", "type": "Person"}}
             ],
             "type": "subgraph"
         }
@@ -225,34 +208,20 @@ multi_etl = {
         {
             "transfer": {
                 "delete": {
-                    "alias": []
+                    "alias": ["i"]
                 },
                 "method": {
-                    "none": {
-                        "over": {}
+                    "attrs": {
+                        "args": {}
                     }
                 },
                 "pattern": [
-                    {
-                        "node": {
-                            "alias": "i"
-                        }
-                    },
-                    {
-                        "edge": {}
-                    },
-                    {
-                        "node": {
-                            "alias": "p1"
-                        }
-                    }
+                    {"node": {"alias": "i"}},
+                    {"edge": {}},
+                    {"node": {"alias": "p1"}}
                 ],
                 "set": [
-                    {
-                        "alias": "p1",
-                        "key": "inst",
-                        "value_lookup": "i.name"
-                    }
+                    {"key": "inst", "value_lookup": "i.name"}
                 ]
             }
         },
@@ -265,27 +234,19 @@ multi_etl = {
                 },
                 "method": {
                     "jaccard": {
-                        "over": [
+                        "args": [
                             "City"
                         ]
                     }
                 },
                 "pattern": [
-                    {
-                        "node": {
-                            "alias": "p1"
-                        }
-                    },
-                    {
-                        "edge": {}
-                    },
-                    {
-                        "node": {
-                            "alias": "p2"
-                        }
-                    }
+                    {"node": {"alias": "p1"}},
+                    {"edge": {}},
+                    {"node": {"alias": "p2"}}
                 ],
-                "set": []
+                "set": [
+                    {"key": "city", "value_lookup": "c.name"}
+                ]
             }
         }
     ]

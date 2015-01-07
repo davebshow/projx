@@ -119,7 +119,7 @@ def project(source, target, graph, attrs={}, node_type_attr="type",
     if method:
         try:
             algorithm = method.keys()[0]
-            over = method[algorithm].get("over", [])
+            over = method[algorithm].get("args", [])
         except IndexError:
             raise Exception("Define edge weight calculation method.")
     if algorithm == "jaccard":
@@ -154,24 +154,25 @@ def transfer(source, target, graph, attrs={}, node_type_attr="type",
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    edges = []
+    over = []
     algorithm = "none"
     method = kwargs.get("method", "")
     if method:
         try:
             algorithm = method.keys()[0]
+            over = method[algorithm].get("args", [])
         except IndexError:
             raise Exception("Please define a valid method.")
-    if algorithm == "edges" or algorithm == "none":
-        nbrs = graph[source]
+    if algorithm == "edges":
+        nbrs = {k: v for (k, v) in graph[source].items()
+                 if graph.node[k][node_type_attr] in over}
         edges = zip([target] * len(nbrs), nbrs,
                     [v for (k, v) in nbrs.items()])
-    if algorithm == "attrs" or algorithm == "none":
-        old_attrs = graph.node[target]
-        merged_attrs = _merge_attrs(attrs, old_attrs,
-                                    [node_type_attr])
-        graph.node[target] = merged_attrs
-    graph = _add_edges_from(graph, edges)
+        graph = _add_edges_from(graph, edges)
+    old_attrs = graph.node[target]
+    merged_attrs = _merge_attrs(attrs, old_attrs,
+                                [node_type_attr])
+    graph.node[target] = merged_attrs
     return graph
 
 
