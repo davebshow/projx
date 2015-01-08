@@ -5,5 +5,5 @@ projx/__init__.py
 projx/api.py
 projx/etl.py
 projx/grammar.py
-projx/nxetl.py
+projx/nxprojx.py
 projx/utils.py

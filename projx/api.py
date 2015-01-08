@@ -5,13 +5,15 @@ from grammar import parse_query
 
 class Projection(object):
 
-    def __init__(self, graph):
+    def __init__(self, graph, node_type_attr="type", edge_type_attr="type"):
         """
         Main API class for the projx DSL.
 
         :param graph: networkx.Graph
         """
         self._graph = graph
+        self._node_type_attr = node_type_attr
+        self._edge_type_attr = edge_type_attr
 
     def execute(self, query):
         """
@@ -20,7 +22,10 @@ class Projection(object):
         :param query: Str. projx DSL query.
         :returns: networkx.Graph
         """
-        return execute_etl(parse_query(query), self._graph)
+        etl = parse_query(query)
+        etl["extractor"]["networkx"]["node_type_attr"] = self._node_type_attr
+        etl["extractor"]["networkx"]["edge_type_attr"] = self._edge_type_attr
+        return execute_etl(etl, self._graph)
 
 
 # ETL can be extended beyond NetworkX.

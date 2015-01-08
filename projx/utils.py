@@ -50,6 +50,8 @@ project_etl = {
     "extractor": {
         "networkx": {
             "type": "subgraph", 
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
             "traversal": [
                 {"node": { "alias": "p1", "type": "Person"}}, 
                 {"edge": {}}, 
@@ -91,6 +93,8 @@ transfer_etl = {
     "extractor": {
         "networkx": {
             "type": "graph", 
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
             "traversal": [
                 {
                     "node": {
@@ -141,7 +145,7 @@ transfer_etl = {
 combine_etl = {
     "extractor": {
         "networkx": {
-            "class": "graph",
+            "type": "graph",
             "node_type_attr": "type",
             "edge_type_attr": "type",
             "traversal": [
