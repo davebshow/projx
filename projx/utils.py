@@ -190,13 +190,11 @@ multi_transform_etl = {
     "extractor": {
         "networkx": {
             "traversal": [
-                {"node": {"alias": "i", "type": "Institution"}},
-                {"edge": {}},
                 {"node": {"alias": "p1", "type": "Person"}},
                 {"edge": {}},
-                {"node": {"alias": "c", "type": "City"}},
+                {"node": {"alias": "i", "type": "Institution"}},
                 {"edge": {}},
-                {"node": {"alias": "p2", "type": "Person"}}
+                {"node": {"alias": "c", "type": "City"}}
             ],
             "type": "subgraph"
         }
@@ -208,17 +206,17 @@ multi_transform_etl = {
         {
             "transfer": {
                 "delete": {
-                    "alias": ["i"]
+                    "alias": []
                 },
                 "method": {
                     "attrs": {
-                        "args": {}
+                        "args": []
                     }
                 },
                 "pattern": [
                     {"node": {"alias": "i"}},
                     {"edge": {}},
-                    {"node": {"alias": "p1"}}
+                    {"node": {"alias": "c"}}
                 ],
                 "set": [
                     {"key": "inst", "value_lookup": "i.name"}
@@ -226,27 +224,25 @@ multi_transform_etl = {
             }
         },
         {
-            "project": {
+            "transfer": {
                 "delete": {
                     "alias": [
-                        "c"
+                        "i"
                     ]
                 },
                 "method": {
-                    "jaccard": {
+                    "edges": {
                         "args": [
                             "City"
                         ]
                     }
                 },
                 "pattern": [
-                    {"node": {"alias": "p1"}},
+                    {"node": {"alias": "i"}},
                     {"edge": {}},
-                    {"node": {"alias": "p2"}}
+                    {"node": {"alias": "p1"}}
                 ],
-                "set": [
-                    {"key": "city", "value_lookup": "c.name"}
-                ]
+                "set": [{}]
             }
         }
     ]
