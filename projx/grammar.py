@@ -150,7 +150,7 @@ def parse_transformation(transformation):
     :param transformations: List. Parser output.
     :returns: List of dicts. Transformers.
     """
-    args = []
+    params = []
     algorithm = "none"
     trans = transformation["transformation"]
     trans_pattern = transformation["transform_pattern"]
@@ -166,10 +166,10 @@ def parse_transformation(transformation):
     if method:
         algorithm = method["algo"]
         if algorithm in ["jaccard", "edges"]:
-            args = method["args"].asList()
+            params = method["args"].asList()
     transformer = {
         trans: {
-            "method": {algorithm: {"args": args}},
+            "method": {algorithm: {"args": params}},
             "pattern": list(roundrobin(trans_nodes, trans_edges)),
             "set": setter,
             "delete": {"alias": delete}

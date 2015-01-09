@@ -51,22 +51,26 @@ class NXProjector(object):
         @self.transformation_wrapper("project")
         def execute_project(source, target, graph, attrs, node_type_attr,
                             edge_type_attr, **kwargs):
-            return project(source, target, graph, attrs, node_type_attr,
-                           edge_type_attr, **kwargs)
+            method = kwargs.get("method", {})
+            params = kwargs.get("params", [])
+            return project(source, target, graph, method, params, attrs,
+                           node_type_attr, edge_type_attr)
 
         @self.transformation_wrapper("transfer")
         def execute_transfer(source, target, graph, attrs, node_type_attr,
                              edge_type_attr, **kwargs):
-            return transfer(source, target, graph, attrs, node_type_attr,
-                            edge_type_attr, **kwargs)
+            method = kwargs.get("method", {})
+            params = kwargs.get("params", [])
+            return transfer(source, target, graph, method, params, attrs,
+                           node_type_attr, edge_type_attr)
 
         @self.transformation_wrapper("combine")
         def execute_combine(source, target, graph, attrs, node_type_attr,
-                            edge_type_attr, node_id="", **kwargs):
+                            edge_type_attr, **kwargs):
             self._id_counter += 1
-            p = partial(combine, node_id=int(self._id_counter))
-            return p(source, target, graph, attrs, node_type_attr,
-                     edge_type_attr, **kwargs)
+            node_id = int(self._id_counter)
+            return combine(source, target, graph, node_id, attrs,
+                           node_type_attr, edge_type_attr)
 
 
 def reset_index(graph):
@@ -101,8 +105,8 @@ def match(node_type_seq, edge_type_seq, graph, node_type_attr="type",
     return paths
 
 
-def project(source, target, graph, attrs={}, node_type_attr="type",
-            edge_type_attr="type", **kwargs):
+def project(source, target, graph, method="jaccard", params=[], attrs={},
+             node_type_attr="type", edge_type_attr="type", **kwargs):
     """
     Executes graph "PROJECT" projection.
 
@@ -113,20 +117,11 @@ def project(source, target, graph, attrs={}, node_type_attr="type",
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    algorithm = "none"
-    over = []
-    method = kwargs.get("method", "")
-    if method:
-        try:
-            algorithm = method.keys()[0]
-            over = method[algorithm].get("args", [])
-        except IndexError:
-            raise Exception("Define edge weight calculation method.")
-    if algorithm == "jaccard":
+    if method == "jaccard":
         snbrs = {node for node in graph[source].keys()
-                 if graph.node[node][node_type_attr] in over}
+                 if graph.node[node][node_type_attr] in params}
         tnbrs = {node for node in graph[target].keys()
-                 if graph.node[node][node_type_attr] in over}
+                 if graph.node[node][node_type_attr] in params}
         intersect = snbrs & tnbrs
         union = snbrs | tnbrs
         jaccard = float(len(intersect)) / len(union)
@@ -142,8 +137,8 @@ def project(source, target, graph, attrs={}, node_type_attr="type",
     return graph
 
 
-def transfer(source, target, graph, attrs={}, node_type_attr="type",
-             edge_type_attr="type", **kwargs):
+def transfer(source, target, graph, method="edges", params=[], attrs={},
+             node_type_attr="type", edge_type_attr="type", **kwargs):
     """
     Execute a graph "TRANSFER" projection.
 
@@ -154,18 +149,9 @@ def transfer(source, target, graph, attrs={}, node_type_attr="type",
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    over = []
-    algorithm = "none"
-    method = kwargs.get("method", "")
-    if method:
-        try:
-            algorithm = method.keys()[0]
-            over = method[algorithm].get("args", [])
-        except IndexError:
-            raise Exception("Please define a valid method.")
-    if algorithm == "edges":
+    if method == "edges":
         nbrs = {k: v for (k, v) in graph[source].items()
-                 if graph.node[k][node_type_attr] in over}
+                if graph.node[k][node_type_attr] in params}
         edges = zip([target] * len(nbrs), nbrs,
                     [v for (k, v) in nbrs.items()])
         graph = _add_edges_from(graph, edges)
@@ -176,8 +162,8 @@ def transfer(source, target, graph, attrs={}, node_type_attr="type",
     return graph
 
 
-def combine(source, target, graph, attrs={}, node_type_attr="type",
-            edge_type_attr="type", node_id="", **kwargs):
+def combine(source, target, graph, node_id="", attrs={},
+            node_type_attr="type", edge_type_attr="type", **kwargs):
 
     """
     Executes graph "COMBINE" projection.
@@ -205,7 +191,6 @@ def combine(source, target, graph, attrs={}, node_type_attr="type",
     graph.add_node(node_id, attrs)
     nbrs = dict(graph[source])
     nbrs.update(dict(graph[target]))
-    # Filter out newly created nodes from neighbors.
     nbrs = {k: v for (k, v) in nbrs.items()
             if graph.node[k][node_type_attr] != node_type}
     edges = zip([node_id] * len(nbrs), nbrs,
