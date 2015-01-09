@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from functools import partial
 from itertools import chain
 import networkx as nx
 
@@ -62,7 +61,7 @@ class NXProjector(object):
             method = kwargs.get("method", {})
             params = kwargs.get("params", [])
             return transfer(source, target, graph, method, params, attrs,
-                           node_type_attr, edge_type_attr)
+                            node_type_attr, edge_type_attr)
 
         @self.transformation_wrapper("combine")
         def execute_combine(source, target, graph, attrs, node_type_attr,
@@ -106,7 +105,7 @@ def match(node_type_seq, edge_type_seq, graph, node_type_attr="type",
 
 
 def project(source, target, graph, method="jaccard", params=[], attrs={},
-             node_type_attr="type", edge_type_attr="type", **kwargs):
+            node_type_attr="type", edge_type_attr="type", **kwargs):
     """
     Executes graph "PROJECT" projection.
 
@@ -172,7 +171,7 @@ def combine(source, target, graph, node_id="", attrs={},
     :param target: Int. Target node for transformation.
     :param attrs: Dict. Attrs to be set during transformation.
     :param graph: networkx.Graph. Graph of subgraph to transform.
-    :param node_id: Int. Id for new node, will autoassign, but 
+    :param node_id: Int. Id for new node, will autoassign, but
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
@@ -311,7 +310,7 @@ def _add_edges_from(graph, edges, edge_type_attr="type"):
     return graph
 
 
-def _merge_attrs(new_attrs, old_attrs, reserved=[]):
+def _merge_attrs(new_attrs, old_attrs, reserved=[], tp="set"):
     """
     Merges dicts handling repeated values as mulitvalued attrs using sets.
 
@@ -325,13 +324,16 @@ def _merge_attrs(new_attrs, old_attrs, reserved=[]):
     for k, v in new_attrs.items():
         if k in reserved:
             attrs[k] = v
-        elif k not in attrs:
-            attrs[k] = set([v])
-        else:
-            val = attrs[k]
-            if not isinstance(val, set):
-                attrs[k] = set([val])
-            attrs[k].update([v])
+        elif tp == "set":
+            if not isinstance(v, set):
+                v = set([v])
+            attrs.setdefault(k, set())
+            attrs[k] = attrs[k] | v
+        elif tp == "list":
+            if not isinstance(v, list):
+                v = list(v)
+            attrs.setdefault(k, list())
+            attrs[k] += v
     return attrs
 
 

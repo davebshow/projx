@@ -3,7 +3,7 @@ from distutils.core import setup
 
 setup(
     name='projx',
-    version='0.2.7',
+    version='0.2.8',
     url='http://projx.readthedocs.org/en/latest/#',
     license='MIT',
     author='davebshow',

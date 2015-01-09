@@ -23,4 +23,6 @@ v0.2.5, 01/06/2015 -- finished refactoring code base. API is finally stable...is
 
 v0.2.6, 01/07/2015 -- removed AS/aliasing from DSL. Attributes are only set on TRANSFER destination or new node or edge as a result of COMBINE and PROJECT. METHOD now accepts a function (ATTRS, EDGES, JACCARD) and functions take args Type1, Type2 .... EDGES function now accepts types as args to determine valid transfers.
 
-v0.2.7, 01/09/2015 -- added node_type_attr and edge_type_attr to api.Projection class. added explicit keyword args to nxprojx.project and nxprojx.transfer. streamlining code base.
+v0.2.7, 01/09/2015 -- added node_type_attr and edge_type_attr to api.Projection class. added explicit keyword args to nxprojx.project and nxprojx.transfer. streamlining code base.  
+
+v0.2.8, --etl._value_lookup now fails quietly.

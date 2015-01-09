@@ -204,7 +204,7 @@ def nx_transformer_pipeline(transformers, graph, paths, node_alias,
     projector = nxprojx.NXProjector(max(graph.nodes()))
     for path in paths:
         for transformer in transformers:
-            trans_kwrd = transformer.keys()[0] 
+            trans_kwrd = transformer.keys()[0]
             src, target, to_set, to_del, method, params = _parse_transformer(
                 transformer[trans_kwrd], node_alias
             )
@@ -267,6 +267,6 @@ def _lookup_attrs(node_alias, graph, to_set, path):
                 alias, lookup_key = lookup.split(".")
                 alias_index = node_alias[alias]
                 node = path[alias_index]
-                value = graph.node[node][lookup_key]
+                value = graph.node[node].get(lookup_key, "")
         attrs[key] = value
     return attrs
