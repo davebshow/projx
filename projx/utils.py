@@ -28,20 +28,20 @@ def test_graph():
         (13, 5, {'type': 'located_in'}),
         (13, 14, {'type': 'works_at'})
     ])
-    g.node[1] = {'type': 'Person', 'name': 'davebshow'}
-    g.node[2] = {'type': 'Institution', 'name': 'western'}
-    g.node[3] = {'type': 'City', 'name': 'london'}
-    g.node[4] = {'type': 'Institution', 'name': 'the matrix'}
-    g.node[5] = {'type': 'City', 'name': 'toronto'}
-    g.node[6] = {'type': 'Person', 'name': 'gandalf'}
-    g.node[7] = {'type': 'Person', 'name': 'versae'}
-    g.node[8] = {'type': 'Person', 'name': 'neo'}
-    g.node[9] = {'type': 'Person', 'name': 'r2d2'}
-    g.node[10] = {'type': 'City', 'name': 'alderon'}
-    g.node[11] = {'type': 'Person', 'name': 'curly'}
-    g.node[12] = {'type': 'Person', 'name': 'adam'}
-    g.node[13] = {'type': 'Institution', 'name': 'canland'}
-    g.node[14] = {'type': 'Person', 'name': 'bro'}
+    g.node[1] = {'type': 'Person', 'label': 'davebshow'}
+    g.node[2] = {'type': 'Institution', 'label': 'western'}
+    g.node[3] = {'type': 'City', 'label': 'london'}
+    g.node[4] = {'type': 'Institution', 'label': 'the matrix'}
+    g.node[5] = {'type': 'City', 'label': 'toronto'}
+    g.node[6] = {'type': 'Person', 'label': 'gandalf'}
+    g.node[7] = {'type': 'Person', 'label': 'versae'}
+    g.node[8] = {'type': 'Person', 'label': 'neo'}
+    g.node[9] = {'type': 'Person', 'label': 'r2d2'}
+    g.node[10] = {'type': 'City', 'label': 'alderon'}
+    g.node[11] = {'type': 'Person', 'label': 'curly'}
+    g.node[12] = {'type': 'Person', 'label': 'adam'}
+    g.node[13] = {'type': 'Institution', 'label': 'canland'}
+    g.node[14] = {'type': 'Person', 'label': 'bro'}
     return g
 
 
@@ -70,7 +70,7 @@ project_etl = {
                     {"node": {"alias": "p2"}}
                 ], 
                 "set": [
-                    {"key": "name", "value_lookup": "wild.name"}
+                    {"key": "name", "value_lookup": "wild.label"}
                 ], 
                 "method": {
                     "jaccard": {
@@ -123,7 +123,7 @@ transfer_etl = {
                     {"node": {"alias": "i"}}
                 ], 
                 "set": [
-                    {"key": "city", "value_lookup": "c.name"}
+                    {"key": "city", "value_lookup": "c.label"}
                 ], 
                 "method": {
                     "edges": {
@@ -172,12 +172,12 @@ combine_etl = {
                     {
                         "key": "city_name",
                         "value":"",
-                        "value_lookup": "c.name"
+                        "value_lookup": "c.label"
                     },
                     {
                         "key": "inst_name",
                         "value":"",
-                        "value_lookup": "i.name"
+                        "value_lookup": "i.label"
                     }
                 ],
                 "delete": {"alias": ["c", "i"]}
@@ -223,7 +223,7 @@ multi_transform_etl = {
                     {"node": {"alias": "c"}}
                 ],
                 "set": [
-                    {"key": "inst", "value_lookup": "i.name"}
+                    {"key": "inst", "value_lookup": "i.label"}
                 ]
             }
         },
@@ -255,7 +255,7 @@ multi_transform_etl = {
 
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
-                      label_attrs=['name']):
+                      label_attrs=['label']):
     """
     Utility function to draw a labeled, colored graph with Matplotlib.
 
@@ -273,7 +273,7 @@ def draw_simple_graph(graph, node_type_attr='type',
     nx.draw_networkx_labels(graph, pos=pos, labels=lbls)
 
 
-def labels(graph, label_attrs=['name']):
+def labels(graph, label_attrs=['label']):
     """
     Utility function that aggreates node attributes as
     labels for drawing graph in Ipython Notebook.

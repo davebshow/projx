@@ -156,7 +156,7 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
         graph = _add_edges_from(graph, edges)
     old_attrs = graph.node[target]
     merged_attrs = _merge_attrs(attrs, old_attrs,
-                                [node_type_attr])
+                                [node_type_attr, "label"])
     graph.node[target] = merged_attrs
     return graph
 
@@ -302,7 +302,7 @@ def _add_edges_from(graph, edges, edge_type_attr="type"):
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
             merged_attrs = _merge_attrs(attrs, edge_attrs,
-                                        [edge_type_attr, "weight"])
+                                        [edge_type_attr, "weight", "label"])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
         else:
@@ -310,30 +310,41 @@ def _add_edges_from(graph, edges, edge_type_attr="type"):
     return graph
 
 
-def _merge_attrs(new_attrs, old_attrs, reserved=[], tp="set"):
+def _merge_attrs(new_attrs, old_attrs, reserved=[]):
     """
-    Merges dicts handling repeated values as mulitvalued attrs using sets.
-
+    Merges attributes counting repeated attrs with dicts.
+    Kind of ugly, will need to take a look at this.
     :param new_attrs: Dict.
     :param old_attrs: Dict.
     :reserved: List. A list of attributes that cannot have more than value.
     :returns: Dict.
     """
     attrs = {}
-    attrs.update(dict(old_attrs))
+    for k, v in old_attrs.items():
+        if k in reserved:
+            attrs[k] = v
+        elif isinstance(v, dict):
+            attrs[k] = dict(v)
+        elif isinstance(v, str) or isinstance(v, unicode):
+            attrs[k] = {v: 1}
     for k, v in new_attrs.items():
         if k in reserved:
             attrs[k] = v
-        elif tp == "set":
-            if not isinstance(v, set):
-                v = set([v])
-            attrs.setdefault(k, set())
-            attrs[k] = attrs[k] | v
-        elif tp == "list":
-            if not isinstance(v, list):
-                v = list(v)
-            attrs.setdefault(k, list())
-            attrs[k] += v
+        elif k in attrs:
+            count_dict = attrs[k]
+            if isinstance(v, dict):
+                for i, j in v.items():
+                    count_dict.setdefault(i, 0)
+                    count_dict[i] += j
+            elif isinstance(v, str) or isinstance(v, unicode):
+                count_dict.setdefault(v, 0)
+                count_dict[v] += 1
+            attrs[k] = count_dict
+        else:
+            if isinstance(v, dict):
+                attrs[k] = dict(v)
+            elif isinstance(v, str) or isinstance(v, unicode):
+                attrs[k] = {v: 1}
     return attrs
 
 

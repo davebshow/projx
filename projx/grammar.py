@@ -63,7 +63,7 @@ csv_pattern << var.setResultsName("pattern", listAllMatches=True) + ZeroOrMore(
 )
 
 # Getter/Setter Pattern.
-attr = Word(alphanums, "." + alphanums)
+attr = (var +  Literal(".") + var).setParseAction(lambda t: ''.join(t))
 right = attr("value_lookup") | quotedString("value").setParseAction(removeQuotes)
 
 gttr_sttr = (
