@@ -166,7 +166,7 @@ def parse_transformation(transformation):
         delete = delete["pattern"].asList()
     if method:
         algorithm = method["algo"]
-        if algorithm in ["jaccard", "edges"]:
+        if algorithm in ["jaccard", "edges", "newman"]:
             params = method["args"].asList()
     transformer = {
         trans: {
