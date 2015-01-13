@@ -26,3 +26,5 @@ v0.2.6, 01/07/2015 -- removed AS/aliasing from DSL. Attributes are only set on T
 v0.2.7, 01/09/2015 -- added node_type_attr and edge_type_attr to api.Projection class. added explicit keyword args to nxprojx.project and nxprojx.transfer. streamlining code base.  
 
 v0.2.8, --etl._value_lookup now fails quietly. fixed bug in grammar.
+
+v0.3.0,  --added newman weight calculation method.

@@ -92,6 +92,7 @@ obj = (
 )("algo")
 algorithm = (
     CaselessKeyword("JACCARD").setParseAction(lambda t: t[0].lower()) |
+    CaselessKeyword("NEWMAN").setParseAction(lambda t: t[0].lower()) |
     CaselessKeyword("EDGES").setParseAction(lambda t: t[0].lower())
 )
 projection_clause = algorithm("algo") + csv_pattern("args")

@@ -116,15 +116,19 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    if method == "jaccard":
+    if method:
         snbrs = {node for node in graph[source].keys()
                  if graph.node[node][node_type_attr] in params}
         tnbrs = {node for node in graph[target].keys()
                  if graph.node[node][node_type_attr] in params}
         intersect = snbrs & tnbrs
-        union = snbrs | tnbrs
-        jaccard = float(len(intersect)) / len(union)
-        attrs["weight"] = jaccard
+        if method == "jaccard":
+            union = snbrs | tnbrs
+            weight = float(len(intersect)) / len(union)
+        elif method == "newman":
+            weight = sum([1.0 / (len(graph[n]) - 1) for n in intersect
+                          if len(graph[n]) > 1])
+        attrs["weight"] = weight
     if graph.has_edge(source, target):
         edge_attrs = graph[source][target]
         merged_attrs = _merge_attrs(attrs, edge_attrs,
