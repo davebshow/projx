@@ -28,4 +28,5 @@ v0.2.7, 01/09/2015 -- added node_type_attr and edge_type_attr to api.Projection 
 v0.2.8, --etl._value_lookup now fails quietly. fixed bug in grammar.
 
 v0.3.0, 01/13/2015 --added newman weight calculation method.
-v0.3.0, 01/13/2015 -- fixed bug in DSL parsing newman weight.
+v0.3.1, 01/13/2015 -- fixed bug in DSL parsing newman weight.
+v0.3.2, 01/14/2015 -- fixed bug in project when method isn't set.

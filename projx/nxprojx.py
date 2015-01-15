@@ -116,7 +116,7 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
-    if method:
+    if method in ["jaccard", "newman"]:
         snbrs = {node for node in graph[source].keys()
                  if graph.node[node][node_type_attr] in params}
         tnbrs = {node for node in graph[target].keys()
@@ -126,7 +126,6 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
             union = snbrs | tnbrs
             weight = float(len(intersect)) / len(union)
         elif method == "newman":
-
             weight = sum([1.0 / (len(graph[n]) - 1) for n in intersect
                           if len(graph[n]) > 1])
         attrs["weight"] = weight
