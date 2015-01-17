@@ -30,3 +30,4 @@ v0.2.8, --etl._value_lookup now fails quietly. fixed bug in grammar.
 v0.3.0, 01/13/2015 --added newman weight calculation method.
 v0.3.1, 01/13/2015 -- fixed bug in DSL parsing newman weight.
 v0.3.2, 01/14/2015 -- fixed bug in project when method isn't set.
+v0.3.3, 01/17/2015 -- added role as a reserved attr. going to have to find a way to set this.

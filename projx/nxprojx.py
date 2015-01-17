@@ -132,7 +132,7 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
     if graph.has_edge(source, target):
         edge_attrs = graph[source][target]
         merged_attrs = _merge_attrs(attrs, edge_attrs,
-                                    [edge_type_attr, "weight"])
+                                    [edge_type_attr, "weight", "label"])
         graph.adj[source][target] = merged_attrs
         graph.adj[target][source] = merged_attrs
     else:
@@ -160,7 +160,7 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
         graph = _add_edges_from(graph, edges)
     old_attrs = graph.node[target]
     merged_attrs = _merge_attrs(attrs, old_attrs,
-                                [node_type_attr, "label"])
+                                [node_type_attr, "label", "role"])
     graph.node[target] = merged_attrs
     return graph
 
