@@ -255,9 +255,7 @@ multi_transform_etl = {
 
 neo4j_etl = {
     "extractor": {
-        "neo4j": { 
-            "node_type_attr": "type",
-            "edge_type_attr": "type",
+        "neo4j": {
             "query": "match (n)--(r:Recipe)--(m) return n, r, m"
         }
     }, 
