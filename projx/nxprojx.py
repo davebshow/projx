@@ -131,7 +131,7 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
         attrs["weight"] = weight
     if graph.has_edge(source, target):
         edge_attrs = graph[source][target]
-        merged_attrs = _merge_attrs(attrs, edge_attrs,
+        merged_attrs = merge_attrs(attrs, edge_attrs,
                                     [edge_type_attr, "weight", "label"])
         graph.adj[source][target] = merged_attrs
         graph.adj[target][source] = merged_attrs
@@ -159,7 +159,7 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
                     [v for (k, v) in nbrs.items()])
         graph = _add_edges_from(graph, edges)
     old_attrs = graph.node[target]
-    merged_attrs = _merge_attrs(attrs, old_attrs,
+    merged_attrs = merge_attrs(attrs, old_attrs,
                                 [node_type_attr, "label", "role"])
     graph.node[target] = merged_attrs
     return graph
@@ -305,7 +305,7 @@ def _add_edges_from(graph, edges, edge_type_attr="type"):
     for source, target, attrs in edges:
         if graph.has_edge(source, target):
             edge_attrs = graph[source][target]
-            merged_attrs = _merge_attrs(attrs, edge_attrs,
+            merged_attrs = merge_attrs(attrs, edge_attrs,
                                         [edge_type_attr, "weight", "label"])
             graph.adj[source][target] = merged_attrs
             graph.adj[target][source] = merged_attrs
@@ -314,7 +314,7 @@ def _add_edges_from(graph, edges, edge_type_attr="type"):
     return graph
 
 
-def _merge_attrs(new_attrs, old_attrs, reserved=[]):
+def merge_attrs(new_attrs, old_attrs, reserved=[]):
     """
     Merges attributes counting repeated attrs with dicts.
     Kind of ugly, will need to take a look at this.

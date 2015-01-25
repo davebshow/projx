@@ -253,6 +253,52 @@ multi_transform_etl = {
 }
 
 
+neo4j_etl = {
+    "extractor": {
+        "neo4j": { 
+            "node_type_attr": "type",
+            "edge_type_attr": "type",
+            "query": "match (n)--(r:Recipe)--(m) return n, r, m"
+        }
+    }, 
+    "transformers": [
+        {
+            "node": {
+                "pattern": [{"node": {"alias": "n", "unique": "UniqueId"}}],
+                "set": [
+                    {"key": "name", "value_lookup": "n.UniqueId"},
+                    {"key": "type", "value": "Ingredient"}
+                ]
+            },
+        },
+        {
+            "node": {
+                "pattern": [{"node": {"alias": "m", "unique": "UniqueId"}}],
+                "set": [
+                    {"key": "name", "value_lookup": "m.UniqueId"},
+                    {"key": "type", "value": "Ingredient"}
+                ]
+            },
+        },
+        {
+            "edge": {
+                "pattern": [
+                    {"node": {"alias": "n", "unique": "UniqueId"}}, 
+                    {"edge": {}}, 
+                    {"node": {"alias": "m", "unique": "UniqueId"}}
+                ], 
+                "set": [
+                    {"key": "name", "value_lookup": "r.UniqueId"}
+                ], 
+            }
+        }
+    ], 
+    "loader": {
+        "neo4j2nx": {}
+    }
+}
+
+
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['label']):
