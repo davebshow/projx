@@ -253,7 +253,7 @@ multi_transform_etl = {
 }
 
 
-neo4j_etl = {
+neo4j2nx_etl = {
     "extractor": {
         "neo4j": {
             "query": "match (n)--(r:Recipe)--(m) return n, r, m"
@@ -293,6 +293,50 @@ neo4j_etl = {
     ], 
     "loader": {
         "neo4j2nx": {}
+    }
+}
+
+
+neo4j2edgelist_etl = {
+    "extractor": {
+        "neo4j": {
+            "query": "match (n)--(r:Recipe)--(m) return n, r, m"
+        }
+    }, 
+    "transformers": [
+        {
+            "node": {
+                "pattern": [{"node": {"alias": "n", "unique": "UniqueId"}}],
+                "set": [
+                    {"key": "name", "value_lookup": "n.UniqueId"},
+                    {"key": "type", "value": "Ingredient"}
+                ]
+            },
+        },
+        {
+            "node": {
+                "pattern": [{"node": {"alias": "m", "unique": "UniqueId"}}],
+                "set": [
+                    {"key": "name", "value_lookup": "m.UniqueId"},
+                    {"key": "type", "value": "Ingredient"}
+                ]
+            },
+        },
+        {
+            "edge": {
+                "pattern": [
+                    {"node": {"alias": "n", "unique": "UniqueId"}}, 
+                    {"edge": {}}, 
+                    {"node": {"alias": "m", "unique": "UniqueId"}}
+                ], 
+                "set": [
+                    {"key": "name", "value_lookup": "r.UniqueId"}
+                ], 
+            }
+        }
+    ], 
+    "loader": {
+        "neo4j2edgelist": {"delim": ",", "filename": "demo.csv", "newline": "\n"}
     }
 }
 

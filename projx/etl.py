@@ -34,12 +34,22 @@ class ETL(object):
         # Get the extractor function.
         self._extractors = {}
         self._init_extractors()
-        self.extractor = self.extractors[self.extractor_name]
+        try:
+            self.extractor = self.extractors[self.extractor_name]
+        except KeyError:
+            raise Exception(
+                "{0} extractor not implemented".format(self.extractor_name)
+            )
 
         # Get the loader function.
         self._loaders = {}
         self._init_loaders()
-        self.loader = self.loaders[self.loader_name]
+        try:
+            self.loader = self.loaders[self.loader_name]
+        except KeyError:
+            raise Exception(
+                "{0} loader not implemented".format(self.loader_name)
+            )
 
     def _get_extractors(self):
         return self._extractors
@@ -97,22 +107,36 @@ class ETL(object):
             :param graph: networkx.Graph
             :returns: projx.nx_loader
             """
-            return nx2nx_loader(transformers, extractor, graph)
+            return nx2nx_loader(transformers, extractor,
+                                self._loader[self.loader_name], graph)
 
         @self.loaders_wrapper("neo4j2nx")
-        def get_neo4j_loader(transformers, extractor, graph):
+        def get_neo4j2nx_loader(transformers, extractor, graph):
             """
             :param tranformers: List of dicts.
             :extractor: function.
             :param graph: networkx.Graph
             :returns: projx.nx_loader
             """
-            return neo4j2nx_loader(transformers, extractor, graph)
+            return neo4j2nx_loader(transformers, extractor,
+                                   self._loader[self.loader_name], graph)
 
 
-########## neo4j2nx Module ###########
+        @self.loaders_wrapper("neo4j2edgelist")
+        def get_neo4j2edgelist_loader(transformers, extractor, graph):
+            """
+            :param tranformers: List of dicts.
+            :extractor: function.
+            :param graph: networkx.Graph
+            :returns: projx.nx_loader
+            """
+            return neo4j2edgelist_loader(transformers, extractor,
+                                   self._loader[self.loader_name], graph)
 
-def neo4j2nx_loader(transformers, extractor, graph):
+
+########## Loaders ###########
+
+def neo4j2nx_loader(transformers, extractor, loader, graph):
     output_graph = nx.Graph()
     query = extractor().get("query", "")
     if len(transformers) > 0 and query:
@@ -132,52 +156,46 @@ def neo4j2nx_loader(transformers, extractor, graph):
                 else:
                     output_graph.node[unique_id].update(attrs)
             elif trans_kwrd == "edge":
-                try:
-                    alias_seq = [(p["node"]["alias"], p["node"]["unique"]) 
-                                 for p in pattern[0::2]]
-                    source = record[alias_seq[0][0]][alias_seq[0][1]]
-                    target = record[alias_seq[-1][0]][alias_seq[-1][1]]
-                except KeyError:
-                    raise Exception("Invalid transformation pattern.")
+                source, target = _neo4j_get_source_target(record, pattern)
                 output_graph = nxprojx.project(source, target, output_graph,
                                                method="", attrs=attrs)
     return output_graph
 
 
-########## Neo4j Module ##########
+def neo4j2edgelist_loader(transformers, extractor, loader, graph):
+    output_graph = nx.Graph()
+    query = extractor().get("query", "")
+    try:
+        filename = loader["filename"]
+    except KeyError:
+        raise Exception("Enter valid filename.")
+    delim = loader.get("delim", ",")
+    newline = loader.get("newline", "\n")
+    if len(transformers) > 0 and query:
+        with open(filename, "w") as f:
+            for trans in neo4j_transformer(query, transformers, graph):
+                record, trans_kwrd, trans, attrs = trans
+                pattern = trans.get("pattern", [])
+                if trans_kwrd == "edge":
+                    source, target = _neo4j_get_source_target(record, pattern)
+                    line = "{0}{1}{2}{3}".format(source, delim, target, newline)
+                    f.write(line)
+    else:
+        raise Exception("Please define query and transformation(s).")
+            
 
-def neo4j_extractor(extractor):
-    return {"query": extractor.get("query", "")}
+def _neo4j_get_source_target(record, pattern):
+    try:
+        alias_seq = [(p["node"]["alias"], p["node"]["unique"]) 
+                     for p in pattern[0::2]]
+        source = record[alias_seq[0][0]][alias_seq[0][1]]
+        target = record[alias_seq[-1][0]][alias_seq[-1][1]]
+    except KeyError:
+        raise Exception("Invalid transformation pattern.")
+    return source, target
 
 
-def neo4j_transformer(query, transformers, graph):
-    for record in graph.cypher.stream(query):
-        for transformer in transformers:
-            trans_kwrd = transformer.keys()[0]
-            trans = transformer[trans_kwrd]
-            to_set = trans.get("set", [])
-            attrs = _neo4j_lookup_attrs(to_set, record)
-            yield record, trans_kwrd, trans, attrs
-
-
-def _neo4j_lookup_attrs(to_set, record):
-    attrs = {}
-    for i, attr in enumerate(to_set):
-        key = attr.get("key", i)
-        value = attr.get("value", "")
-        if not value:
-            lookup = attr.get("value_lookup", "")
-            if lookup:
-                alias, lookup_key = lookup.split(".")
-                node = record[alias]
-                value = node[lookup_key]
-        attrs[key] = value
-    return attrs
-
-
-############# nx2nx Module ############
-
-def nx2nx_loader(transformers, extractor, graph):
+def nx2nx_loader(transformers, extractor, loader, graph):
     """
     Loader for NetworkX graph.
 
@@ -243,7 +261,7 @@ def nx2nx_transform_and_load(transformer, graph, paths, node_alias,
 
 def _parse_nx2nx_transformer(trans, node_alias):
     pattern = trans["pattern"]
-    source, target = _get_source_target(node_alias, pattern)
+    source, target = _nx_get_source_target(node_alias, pattern)
     delete_alias = trans.get("delete", {}).get("alias", [])
     to_delete = [node_alias[alias] for alias in delete_alias]
     method = trans.get("method", {"none": []})
@@ -252,7 +270,7 @@ def _parse_nx2nx_transformer(trans, node_alias):
     return source, target, to_delete, method_kwrd, params
 
 
-def _get_source_target(node_alias, pattern):
+def _nx_get_source_target(node_alias, pattern):
     """
     Uses Node alias system to perform a pattern match.
 
@@ -267,6 +285,37 @@ def _get_source_target(node_alias, pattern):
     source = node_alias[alias_seq[0]]
     target = node_alias[alias_seq[-1]]
     return source, target
+
+
+########## Neo4j Module ##########
+
+def neo4j_extractor(extractor):
+    return {"query": extractor.get("query", "")}
+
+
+def neo4j_transformer(query, transformers, graph):
+    for record in graph.cypher.stream(query):
+        for transformer in transformers:
+            trans_kwrd = transformer.keys()[0]
+            trans = transformer[trans_kwrd]
+            to_set = trans.get("set", [])
+            attrs = _neo4j_lookup_attrs(to_set, record)
+            yield record, trans_kwrd, trans, attrs
+
+
+def _neo4j_lookup_attrs(to_set, record):
+    attrs = {}
+    for i, attr in enumerate(to_set):
+        key = attr.get("key", i)
+        value = attr.get("value", "")
+        if not value:
+            lookup = attr.get("value_lookup", "")
+            if lookup:
+                alias, lookup_key = lookup.split(".")
+                node = record[alias]
+                value = node[lookup_key]
+        attrs[key] = value
+    return attrs
 
 
 ########## NetworkX module ##########
