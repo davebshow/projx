@@ -140,7 +140,7 @@ def parse_query(query):
         },
         "transformers": map(parse_transformation, transformations),
         "loader": {
-            "networkx": {}
+            "nx2nx": {}
         }
     }
     return etl

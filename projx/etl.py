@@ -89,8 +89,8 @@ class ETL(object):
         Update loaders dict to allow for extensible loader functionality.
         Returns a class/function that performs transformation and loads graph.
         """
-        @self.loaders_wrapper("networkx")
-        def get_nx_loader(transformers, extractor, graph):
+        @self.loaders_wrapper("nx2nx")
+        def get_nx2nx_loader(transformers, extractor, graph):
             """
             :param tranformers: List of dicts.
             :extractor: function.
@@ -110,29 +110,17 @@ class ETL(object):
             return neo4j2nx_loader(transformers, extractor, graph)
 
 
-########## Neo4j2NX Module ###########
+########## neo4j2nx Module ###########
 
 def neo4j2nx_loader(transformers, extractor, graph):
     output_graph = nx.Graph()
-    context = extractor()
-    if len(transformers) > 0:
-        output_graph = neo4j2nx_transformer(context["query"], transformers,
-                                             graph, output_graph)
-    return output_graph
-
-
-def neo4j_extractor(extractor):
-    return {"query": extractor.get("query", "")}
-
-
-def neo4j2nx_transformer(query, transformers, graph, output_graph):
-    for record in graph.cypher.stream(query):
-        for transformer in transformers:
-            trans_kwrd = transformer.keys()[0]
-            trans = transformer[trans_kwrd]
-            to_set = trans.get("set", [])
-            attrs = _neo4j_lookup_attrs(to_set, record)
-            pattern = trans.get("pattern", [])
+    query = extractor().get("query", "")
+    if len(transformers) > 0 and query:
+        for trans in neo4j_transformer(query, transformers, graph):
+            record = trans[0]
+            trans_kwrd = trans[1]
+            attrs = trans[2]
+            pattern = trans[3]
             if trans_kwrd == "node":
                 try:
                     node = pattern[0].get("node", {})
@@ -158,6 +146,23 @@ def neo4j2nx_transformer(query, transformers, graph, output_graph):
     return output_graph
 
 
+########## Neo4j Module ##########
+
+def neo4j_extractor(extractor):
+    return {"query": extractor.get("query", "")}
+
+
+def neo4j_transformer(query, transformers, graph):
+    for record in graph.cypher.stream(query):
+        for transformer in transformers:
+            trans_kwrd = transformer.keys()[0]
+            trans = transformer[trans_kwrd]
+            to_set = trans.get("set", [])
+            attrs = _neo4j_lookup_attrs(to_set, record)
+            pattern = trans.get("pattern", [])
+            yield record, trans_kwrd, attrs, pattern
+
+
 def _neo4j_lookup_attrs(to_set, record):
     attrs = {}
     for i, attr in enumerate(to_set):
@@ -173,7 +178,7 @@ def _neo4j_lookup_attrs(to_set, record):
     return attrs
 
 
-############# NetworkX Module ############
+############# nx2nx Module ############
 
 def nx2nx_loader(transformers, extractor, graph):
     """
@@ -182,30 +187,92 @@ def nx2nx_loader(transformers, extractor, graph):
     :returns: networkx.Graph
     """
     context = extractor(graph)
-
+    graph = context["graph"]
     if len(transformers) > 1:
-        graph = nx_transformer_pipeline(
-            transformers,
-            context["graph"],
-            context["paths"],
-            context["node_alias"],
-            context["node_type_attr"],
-            context["edge_type_attr"]
-        )
+        removals = set()
+        projector = nxprojx.NXProjector(max(graph.nodes()))
+        for trans in nx_transformer(transformers, graph, context["paths"], 
+                                    context["node_alias"]):
+            path, trans_kwrd, trans, node_alias, attrs = trans
+            src, target, to_del, method, params = _parse_nx2nx_transformer(
+                trans, node_alias
+            )
+            fn = projector.transformations[trans_kwrd]
+            graph = fn(path[src], path[target], graph, attrs, context["node_type_attr"],
+                       context["edge_type_attr"], method=method, params=params)
+            for i in to_del:
+                removals.update([path[i]])
+        graph.remove_nodes_from(removals)
     elif len(transformers) == 1:
-        graph = nx_transformer(
+        # Repeats code, but represents the most common nx use case.
+        graph = nx2nx_transform_and_load(
             transformers[0],
-            context["graph"],
+            graph,
             context["paths"],
             context["node_alias"],
             context["node_type_attr"],
             context["edge_type_attr"]
         )
-    else:
-        graph = context["graph"]
     return graph
 
 
+def nx2nx_transform_and_load(transformer, graph, paths, node_alias,
+                             node_type_attr, edge_type_attr):
+    """
+    Special transformer/loader for single transformations across nx graphs.
+
+    :param graph: networkx.Graph
+    :param paths: List of lists.
+    :returns: networkx.Graph
+    """
+    removals = set()
+    projector = nxprojx.NXProjector(max(graph.nodes()))
+    trans_kwrd = transformer.keys()[0]
+    trans = transformer[trans_kwrd]
+    to_set = trans.get("set", [])
+    src, target, to_del, method, params = _parse_nx2nx_transformer(
+        trans, node_alias
+    )
+    fn = projector.transformations[trans_kwrd]
+    for path in paths:
+        attrs = _nx_lookup_attrs(node_alias, graph, to_set, path)
+        graph = fn(path[src], path[target], graph, attrs, node_type_attr,
+                   edge_type_attr, method=method, params=params)
+        for i in to_del:
+            removals.update([path[i]])
+    graph.remove_nodes_from(removals)
+    return graph
+
+
+def _parse_nx2nx_transformer(trans, node_alias):
+    pattern = trans["pattern"]
+    source, target = _get_source_target(node_alias, pattern)
+    delete_alias = trans.get("delete", {}).get("alias", [])
+    to_delete = [node_alias[alias] for alias in delete_alias]
+    method = trans.get("method", {"none": []})
+    method_kwrd = method.keys()[0]
+    params = method.get(method_kwrd, {"args": []})["args"]
+    return source, target, to_delete, method_kwrd, params
+
+
+def _get_source_target(node_alias, pattern):
+    """
+    Uses Node alias system to perform a pattern match.
+
+    :param node_alias: Dict.
+    :param pattern: List.
+    :returns: Int. Source and target list indices.
+    """
+    try:
+        alias_seq = [p["node"]["alias"] for p in pattern[0::2]]
+    except KeyError:
+        raise Exception("Please define valid transformation pattern.")
+    source = node_alias[alias_seq[0]]
+    target = node_alias[alias_seq[-1]]
+    return source, target
+
+
+########## NetworkX module ##########
 def nx_extractor(extractor, graph):
     """
     Parses etl extractor JSON and produces all of the data necessary for
@@ -247,34 +314,7 @@ def nx_extractor(extractor, graph):
     }
 
 
-def nx_transformer(transformer, graph, paths, node_alias, node_type_attr,
-                   edge_type_attr):
-    """
-    Static transformer for NetworkX graph. Single transformation.
-
-    :param graph: networkx.Graph
-    :param paths: List of lists.
-    :returns: networkx.Graph
-    """
-    removals = set()
-    projector = nxprojx.NXProjector(max(graph.nodes()))
-    trans_kwrd = transformer.keys()[0]
-    src, target, to_set, to_del, method, params = _parse_nx_transformer(
-        transformer[trans_kwrd], node_alias
-    )
-    fn = projector.transformations[trans_kwrd]
-    for path in paths:
-        attrs = _lookup_attrs(node_alias, graph, to_set, path)
-        graph = fn(path[src], path[target], graph, attrs, node_type_attr,
-                   edge_type_attr, method=method, params=params)
-        for i in to_del:
-            removals.update([path[i]])
-    graph.remove_nodes_from(removals)
-    return graph
-
-
-def nx_transformer_pipeline(transformers, graph, paths, node_alias,
-                            node_type_attr, edge_type_attr):
+def nx_transformer(transformers, graph, paths, node_alias):
     """
     Pipeline transformer for NetworkX graph. Multiple transformations.
 
@@ -284,54 +324,16 @@ def nx_transformer_pipeline(transformers, graph, paths, node_alias,
     :param paths: List of lists.
     :returns: networkx.Graph
     """
-    removals = set()
-    projector = nxprojx.NXProjector(max(graph.nodes()))
     for path in paths:
         for transformer in transformers:
             trans_kwrd = transformer.keys()[0]
-            src, target, to_set, to_del, method, params = _parse_nx_transformer(
-                transformer[trans_kwrd], node_alias
-            )
-            attrs = _lookup_attrs(node_alias, graph, to_set, path)
-            fn = projector.transformations[trans_kwrd]
-            graph = fn(path[src], path[target], graph, attrs, node_type_attr,
-                       edge_type_attr, method=method, params=params)
-            for i in to_del:
-                removals.update([path[i]])
-    graph.remove_nodes_from(removals)
-    return graph
+            trans = transformer[trans_kwrd]
+            to_set = trans.get("set", [])
+            attrs = _nx_lookup_attrs(node_alias, graph, to_set, path)
+            yield path, trans_kwrd, trans, node_alias, attrs
 
 
-def _parse_nx_transformer(trans, node_alias):
-    pattern = trans["pattern"]
-    source, target = _get_source_target(node_alias, pattern)
-    to_set = trans.get("set", [])
-    delete_alias = trans.get("delete", {}).get("alias", [])
-    to_delete = [node_alias[alias] for alias in delete_alias]
-    method = trans.get("method", {"none": []})
-    method_kwrd = method.keys()[0]
-    params = method.get(method_kwrd, {"args": []})["args"]
-    return source, target, to_set, to_delete, method_kwrd, params
-
-
-def _get_source_target(node_alias, pattern):
-    """
-    Uses Node alias system to perform a pattern match.
-
-    :param node_alias: Dict.
-    :param pattern: List.
-    :returns: Int. Source and target list indices.
-    """
-    try:
-        alias_seq = [p["node"]["alias"] for p in pattern[0::2]]
-    except KeyError:
-        raise Exception("Please define valid transformation pattern.")
-    source = node_alias[alias_seq[0]]
-    target = node_alias[alias_seq[-1]]
-    return source, target
-
-
-def _lookup_attrs(node_alias, graph, to_set, path):
+def _nx_lookup_attrs(node_alias, graph, to_set, path):
     """
     Helper to get attrs based on set input.
 

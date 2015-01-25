@@ -84,7 +84,7 @@ project_etl = {
         }
     ], 
     "loader": {
-        "networkx": {}
+        "nx2nx": {}
     }
 }
 
@@ -137,7 +137,7 @@ transfer_etl = {
         }
     ], 
     "loader": {
-        "networkx": {}
+        "nx2nx": {}
     }
 }
 
@@ -185,7 +185,7 @@ combine_etl = {
         }
     ],
     "loader": {
-        "networkx": {}
+        "nx2nx": {}
     }
 }
 
@@ -204,7 +204,7 @@ multi_transform_etl = {
         }
     },
     "loader": {
-        "networkx": {}
+        "nx2nx": {}
     },
     "transformers": [
         {
