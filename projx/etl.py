@@ -117,10 +117,8 @@ def neo4j2nx_loader(transformers, extractor, graph):
     query = extractor().get("query", "")
     if len(transformers) > 0 and query:
         for trans in neo4j_transformer(query, transformers, graph):
-            record = trans[0]
-            trans_kwrd = trans[1]
-            attrs = trans[2]
-            pattern = trans[3]
+            record, trans_kwrd, trans, attrs = trans
+            pattern = trans.get("pattern", [])
             if trans_kwrd == "node":
                 try:
                     node = pattern[0].get("node", {})
@@ -159,8 +157,7 @@ def neo4j_transformer(query, transformers, graph):
             trans = transformer[trans_kwrd]
             to_set = trans.get("set", [])
             attrs = _neo4j_lookup_attrs(to_set, record)
-            pattern = trans.get("pattern", [])
-            yield record, trans_kwrd, attrs, pattern
+            yield record, trans_kwrd, trans, attrs
 
 
 def _neo4j_lookup_attrs(to_set, record):
