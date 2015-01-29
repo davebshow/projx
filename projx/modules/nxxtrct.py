@@ -2,36 +2,6 @@
 from projx import nxprojx
 
 
-def nx_loader(transformers, extractor, loader, graph):
-    output_graph = nx.Graph()
-    query = extractor().get("query", "")
-    if len(transformers) > 0 and query:
-        # Transformer should accept extractor
-        # Then the purpose of load is to process the standard
-        # Transformer yield with whatever customizations necessary
-        # Therefore, extractors and transformers are coupled,
-        # loaders are independent
-        for trans in neo4j_transformer(query, transformers, graph):
-            record, trans_kwrd, trans, attrs = trans
-            pattern = trans.get("pattern", [])
-            if trans_kwrd == "node":
-                try:
-                    node = pattern[0].get("node", {})
-                    unique = node.get("unique", "")
-                    alias = node.get("alias", "")
-                    unique_id = record[alias][unique]
-                except (IndexError, KeyError):
-                    raise Exception("Invalid transformation pattern.")
-                if unique_id not in output_graph:
-                    output_graph.add_node(unique_id, attrs)
-                else:
-                    output_graph.node[unique_id].update(attrs)
-            elif trans_kwrd == "edge":
-                source, target = _neo4j_get_source_target(record, pattern)
-                output_graph = nxprojx.project(source, target, output_graph,
-                                               method="", attrs=attrs)
-    return output_graph
-
 
 def nx_extractor(extractor_json, graph):
     """

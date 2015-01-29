@@ -99,11 +99,6 @@ def neo4j2nx_loader(transformers, extractor, loader_json, graph):
     output_graph = nx.Graph()
     query = extractor().get("query", "")
     if len(transformers) > 0 and query:
-        # Transformer should accept extractor
-        # Then the purpose of load is to process the standard
-        # Transformer yield with whatever customizations necessary
-        # Therefore, extractors and transformers are coupled,
-        # loaders are independent
         for trans in neo4j_transformer(query, transformers, graph):
             record, trans_kwrd, trans, attrs = trans
             pattern = trans.get("pattern", [])
