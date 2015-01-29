@@ -3,6 +3,23 @@ from itertools import chain
 import networkx as nx
 
 
+class Record(object):
+
+    def __init__(self, path, alias):
+        self._list = path
+        self._dict = {}
+        for i in range(len(path)):
+            self._dict[alias[i]] = path[i]
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self._dict[item]
+        elif isinstance(item, int):
+            return self._list[item]
+        else:
+            raise Exception("Bad index.")
+
+
 class NXProjector(object):
     def __init__(self, id_counter):
         """
@@ -85,8 +102,8 @@ def reset_index(graph):
     return graph
 
 
-def match(node_type_seq, edge_type_seq, graph, node_type_attr="type",
-          edge_type_attr="type"):
+def match(node_type_seq, edge_type_seq, graph, node_alias=None,
+          node_type_attr="type", edge_type_attr="type"):
     """
     Executes traversals to perform initial match on pattern.
 
@@ -98,9 +115,9 @@ def match(node_type_seq, edge_type_seq, graph, node_type_attr="type",
     for node, attrs in graph.nodes(data=True):
         if attrs[node_type_attr] == start_type or not start_type:
             paths = traverse(node, node_type_seq[1:], edge_type_seq, graph,
-                             node_type_attr, edge_type_attr)
+                             node_alias, node_type_attr, edge_type_attr)
             path_list.append(paths)
-    paths = list(chain.from_iterable(path_list))
+    paths = chain.from_iterable(path_list)
     return paths
 
 
@@ -166,7 +183,7 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
 
 
 def combine(source, target, graph, node_id="", attrs={},
-            node_type_attr="type", edge_type_attr="type", **kwargs):
+            node_type_attr="type", edge_type_attr="type"):
 
     """
     Executes graph "COMBINE" projection.
@@ -197,13 +214,13 @@ def combine(source, target, graph, node_id="", attrs={},
     nbrs = {k: v for (k, v) in nbrs.items()
             if graph.node[k][node_type_attr] != node_type}
     edges = zip([node_id] * len(nbrs), nbrs,
-                [v for (k, v) in nbrs.items()])
+                [v for (_, v) in nbrs.items()])
     graph = _add_edges_from(graph, edges)
     return graph
 
 
 def traverse(start, node_type_seq, edge_type_seq, graph,
-             node_type_attr="type", edge_type_attr="type"):
+             node_alias=None, node_type_attr="type", edge_type_attr="type"):
     """
     This is a controlled depth, depth first traversal of a NetworkX
     graph and the core of this library. Criteria for searching depends
@@ -268,7 +285,10 @@ def traverse(start, node_type_seq, edge_type_seq, graph,
         # If max depth reached, store the
         # valid node sequence.
         else:
-            paths.append(list(stack))
+            path = list(stack)
+            if node_alias:
+                path = Record(path, node_alias)
+            paths.append(path)
             # Backtrack and keep checking.
             stack.pop()
             current = stack[-1]

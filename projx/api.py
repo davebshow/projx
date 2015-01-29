@@ -28,8 +28,7 @@ class Projection(object):
         return execute_etl(etl, self._graph)
 
 
-# ETL can be extended beyond NetworkX.
-def execute_etl(etl, graph):
+def execute_etl(etl, source_graph):
     """
     Main API function. Executes ETL on graph.
 
@@ -38,13 +37,17 @@ def execute_etl(etl, graph):
     :return graph: The projected graph.
     """
     etl = ETL(etl)
-    # Extractor is a function that returns a projector class.
+    # Extractor is a function that returns the data source and all necessary
+    # info to open up a data stream.
     extractor = etl.extractor
+    # Yields four objects that are processed by transformers in load.
+    # Each stream is custom for an extractor, but the output is generic
+    # for specified loaders
+    stream = etl.stream
     # List of transformers.
     transformers = etl.transformers
-    # Loader can be a class or function that contains transformer.
+    # Loader can be a class or function that runs the etl pipeline.
     loader = etl.loader
-    # Loader should accept a transfomer list, a projector object, and the
-    # graph.
-    graph = loader(transformers, extractor, graph)
+    # Loaders accept extractor, stream, transformers, source_graph
+    graph = loader(extractor, stream, transformers, source_graph)
     return graph
