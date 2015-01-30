@@ -7,3 +7,7 @@ projx/etl.py
 projx/grammar.py
 projx/nxprojx.py
 projx/utils.py
+projx/modules/__init__.py
+projx/modules/loaders.py
+projx/modules/neo4j_xtrct.py
+projx/modules/nx_xtrct.py

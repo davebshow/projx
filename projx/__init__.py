@@ -5,3 +5,4 @@ from .nxprojx import (reset_index, match, traverse, project, transfer,
 from .utils import (test_graph, project_etl, transfer_etl, combine_etl,
                     multi_transform_etl, draw_simple_graph, remove_edges,
                     proj_density, neo4j2nx_etl)
+import modules

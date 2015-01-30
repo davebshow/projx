@@ -24,12 +24,12 @@ $ git clone https://github.com/davebshow/projx.git
 The **projx DSL** is a declarative query language based on Neo4j's Cypher. It consists of MATCH statements and transformations. To use the it, first instantiate a projection of a multipartite NetworkX graph:
 
 ```python
-import projx as px
+>>> import projx as px
 
 # This returns a multipartite networkx.Graph where each node has an
 # attribute "type".
-graph = test_graph()
-p = px.Projection(graph)
+>>> graph = test_graph()
+>>> p = px.Projection(graph)
 ```
 
 #### The match clause
@@ -37,7 +37,7 @@ Then execute a MATCH statement written in the projx [DSL](dsl.md):
 
 ```python
 # This returns an instance of networkx.Graph
-p.execute("MATCH (m)-(n)")
+>>> p.execute("MATCH (m)-(n)")
 ```
 
 The above match pattern will match all dyads (two nodes connected by an edge) in the graph. Notice there is no RETURN statement, the projx.Projection.execute builds and returns an instance of networkx.Graph that contains all paths matched by the match pattern.
@@ -46,7 +46,7 @@ To match a subgraph of the original graph, we can limit our match pattern using 
 
 ```python
 # This returns an instance of networkx.Graph
-p.execute("MATCH (p1:Person)-(c:City)-(p2:Person)")
+>>> p.execute("MATCH (p1:Person)-(c:City)-(p2:Person)")
 ```
 
 Notice the syntax for denoting a node is quite simple, it consists of parenthesis containing an alias, a colon delimiter, and then a (p2:Person)node type (alias:NodeType).
@@ -55,7 +55,7 @@ Edge type criteria can also be used in pattern matching. Observe:
 
 ```python
 # This returns an instance of networkx.Graph
-p.execute("MATCH (p1:Person)-[l:lives_in]-(c:City)")
+>>> p.execute("MATCH (p1:Person)-[l:lives_in]-(c:City)")
 ```
 
 This statement only matches limits matching people and cities by the type of edge connecting them, in this case "lives in".
@@ -69,11 +69,11 @@ After we match a pattern, we would often like to transform it in some way or ano
 ```python
 # This returns a one mode social network of people who are associated through
 # nodes of type city.
-p.execute("""
-    MATCH (p1:Person)-(c:City)-(p2:Person)
-    PROJECT (p1)-(p2)
-    DELETE c
-""")
+>>> p.execute("""
+        MATCH (p1:Person)-(c:City)-(p2:Person)
+        PROJECT (p1)-(p2)
+        DELETE c
+    """)
 ```
 
 A transformation clause, in this case, MATCH takes a pattern similar to the match pattern as an argument. However, unlike the match pattern, the transformation pattern employs only the alias established by the match patter.
@@ -81,13 +81,13 @@ A transformation clause, in this case, MATCH takes a pattern similar to the matc
 Furthermore, we can specify attributes that we would like to set on the newly created elements (in the case of PROJECT, a new edge), nodes we would like to delete from the projection referenced simply through their alias, and special methods. The following demonstrates using a special method to make an edge weight calculation during the projection using the Newman technique:
 
 ```python
-p.execute("""
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-""")
+>>> p.execute("""
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    """)
 ```
 
 Notice the method NEWMAN takes node types as arguments. These determine what sort of connections between people will be used in the edge weight calculation.
@@ -99,14 +99,13 @@ The projx DSL also implements the transformations TRANSFER and COMBINE. For a fu
 When you run the DSL, the first thing projx does is parse the query, producing a JSON structure that is the **projx** version of an ETL config file. This concept is based on orientdb-etl. The ETL is a simply a JSON config file or Python dict data structure. Here's an example of what the parser returns:
 
 ```python
-print(json.dumps(px.parse_query(("""
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-""")), indent=2))
-
+>>> print(json.dumps(px.parse_query(("""
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    """)), indent=2))
 {
   "extractor": {
     "networkx": {
@@ -187,13 +186,13 @@ print(json.dumps(px.parse_query(("""
 This structure, which will be thoroughly addressed in the [next section](#using-the-etl-api), is then simply passed to the other main API function that executes the ETL pipeline:
 
 ```python
-etl = px.parse_query("""
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-""")
+>>> etl = px.parse_query("""
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    """)
 # Main API function.
 subgraph = px.execute_etl(etl, g)
 ```

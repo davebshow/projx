@@ -149,30 +149,30 @@
 <h2 id="using-projx-with-networkx">Using projx with NetworkX</h2>
 <h3 id="the-dsl">The DSL</h3>
 <p>The <strong>projx DSL</strong> is a declarative query language based on Neo4j's Cypher. It consists of MATCH statements and transformations. To use the it, first instantiate a projection of a multipartite NetworkX graph:</p>
-<pre><code class="python">import projx as px
+<pre><code class="python">&gt;&gt;&gt; import projx as px
 
 # This returns a multipartite networkx.Graph where each node has an
 # attribute &quot;type&quot;.
-graph = test_graph()
-p = px.Projection(graph)
+&gt;&gt;&gt; graph = test_graph()
+&gt;&gt;&gt; p = px.Projection(graph)
 </code></pre>
 
 <h4 id="the-match-clause">The match clause</h4>
 <p>Then execute a MATCH statement written in the projx <a href="../dsl">DSL</a>:</p>
 <pre><code class="python"># This returns an instance of networkx.Graph
-p.execute(&quot;MATCH (m)-(n)&quot;)
+&gt;&gt;&gt; p.execute(&quot;MATCH (m)-(n)&quot;)
 </code></pre>
 
 <p>The above match pattern will match all dyads (two nodes connected by an edge) in the graph. Notice there is no RETURN statement, the projx.Projection.execute builds and returns an instance of networkx.Graph that contains all paths matched by the match pattern.</p>
 <p>To match a subgraph of the original graph, we can limit our match pattern using criteria such as node type to only match a subset of paths. The following statement matches a path of all people who are connected through a city, and then returns a bipartite graph of people and the cities they are connected to:</p>
 <pre><code class="python"># This returns an instance of networkx.Graph
-p.execute(&quot;MATCH (p1:Person)-(c:City)-(p2:Person)&quot;)
+&gt;&gt;&gt; p.execute(&quot;MATCH (p1:Person)-(c:City)-(p2:Person)&quot;)
 </code></pre>
 
 <p>Notice the syntax for denoting a node is quite simple, it consists of parenthesis containing an alias, a colon delimiter, and then a (p2:Person)node type (alias:NodeType).</p>
 <p>Edge type criteria can also be used in pattern matching. Observe:</p>
 <pre><code class="python"># This returns an instance of networkx.Graph
-p.execute(&quot;MATCH (p1:Person)-[l:lives_in]-(c:City)&quot;)
+&gt;&gt;&gt; p.execute(&quot;MATCH (p1:Person)-[l:lives_in]-(c:City)&quot;)
 </code></pre>
 
 <p>This statement only matches limits matching people and cities by the type of edge connecting them, in this case "lives in".</p>
@@ -181,36 +181,35 @@ p.execute(&quot;MATCH (p1:Person)-[l:lives_in]-(c:City)&quot;)
 <p>After we match a pattern, we would often like to transform it in some way or another. Taking the bipartite graph of types Person and City from above as an example, we may want to compress it into a one mode graph like a social network. <strong>projx</strong> makes this easy:</p>
 <pre><code class="python"># This returns a one mode social network of people who are associated through
 # nodes of type city.
-p.execute(&quot;&quot;&quot;
-    MATCH (p1:Person)-(c:City)-(p2:Person)
-    PROJECT (p1)-(p2)
-    DELETE c
-&quot;&quot;&quot;)
+&gt;&gt;&gt; p.execute(&quot;&quot;&quot;
+        MATCH (p1:Person)-(c:City)-(p2:Person)
+        PROJECT (p1)-(p2)
+        DELETE c
+    &quot;&quot;&quot;)
 </code></pre>
 
 <p>A transformation clause, in this case, MATCH takes a pattern similar to the match pattern as an argument. However, unlike the match pattern, the transformation pattern employs only the alias established by the match patter.</p>
 <p>Furthermore, we can specify attributes that we would like to set on the newly created elements (in the case of PROJECT, a new edge), nodes we would like to delete from the projection referenced simply through their alias, and special methods. The following demonstrates using a special method to make an edge weight calculation during the projection using the Newman technique:</p>
-<pre><code class="python">p.execute(&quot;&quot;&quot;
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-&quot;&quot;&quot;)
+<pre><code class="python">&gt;&gt;&gt; p.execute(&quot;&quot;&quot;
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    &quot;&quot;&quot;)
 </code></pre>
 
 <p>Notice the method NEWMAN takes node types as arguments. These determine what sort of connections between people will be used in the edge weight calculation.</p>
 <p>The projx DSL also implements the transformations TRANSFER and COMBINE. For a full description of transformations and the DSL, please refer to the <a href="../dsl">DSL docs</a></p>
 <h3 id="etl">ETL</h3>
 <p>When you run the DSL, the first thing projx does is parse the query, producing a JSON structure that is the <strong>projx</strong> version of an ETL config file. This concept is based on orientdb-etl. The ETL is a simply a JSON config file or Python dict data structure. Here's an example of what the parser returns:</p>
-<pre><code class="python">print(json.dumps(px.parse_query((&quot;&quot;&quot;
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-&quot;&quot;&quot;)), indent=2))
-
+<pre><code class="python">&gt;&gt;&gt; print(json.dumps(px.parse_query((&quot;&quot;&quot;
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    &quot;&quot;&quot;)), indent=2))
 {
   &quot;extractor&quot;: {
     &quot;networkx&quot;: {
@@ -289,13 +288,13 @@ p.execute(&quot;&quot;&quot;
 </code></pre>
 
 <p>This structure, which will be thoroughly addressed in the <a href="#using-the-etl-api">next section</a>, is then simply passed to the other main API function that executes the ETL pipeline:</p>
-<pre><code class="python">etl = px.parse_query(&quot;&quot;&quot;
-    MATCH   (p1:Person)-(wild)-(p2:Person)
-    PROJECT (p1)-(p2)
-    METHOD JACCARD Institution, City
-    SET     name = wild.label
-    DELETE  wild
-&quot;&quot;&quot;)
+<pre><code class="python">&gt;&gt;&gt; etl = px.parse_query(&quot;&quot;&quot;
+        MATCH   (p1:Person)-(wild)-(p2:Person)
+        PROJECT (p1)-(p2)
+        METHOD JACCARD Institution, City
+        SET     name = wild.label
+        DELETE  wild
+    &quot;&quot;&quot;)
 # Main API function.
 subgraph = px.execute_etl(etl, g)
 </code></pre>
