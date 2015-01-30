@@ -2,7 +2,7 @@
 
 **alpha**
 
-**projx** provides a simple and extensible API for interacting with graphs in Python. Its core functionality is built around making graph transformations in memory using the [NetworkX](https://networkx.github.io/) module and a DSL based on [Neo4j's](http://neo4j.com/) [Cypher](http://neo4j.com/docs/stable/cypher-query-lang.html) query language. It also provides an extensible ETL pipeline that uses JSON config (roughly modeled after [orientdb-etl](https://github.com/orientechnologies/orientdb-etl/wiki)) to translate graph data between various persistent and in-memory representations.
+**projx** provides a simple and extensible API for interacting with graphs in Python. Its core functionality is built around making graph transformations using the [NetworkX](https://networkx.github.io/) module and a DSL based on [Neo4j's](http://neo4j.com/) [Cypher](http://neo4j.com/docs/stable/cypher-query-lang.html) query language. It also provides an extensible ETL pipeline that uses JSON configuration (roughly modeled after [orientdb-etl](https://github.com/orientechnologies/orientdb-etl/wiki)) to translate graph data between various persistent and in-memory representations.
 
 **[Official Documentation](http://davebshow.github.io/projx/)**
 
