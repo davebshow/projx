@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Getting Starting - projx</title>
+  <title>Getting Started - projx</title>
   
 
   
@@ -42,19 +42,28 @@
       <ul class="current">
     
         
-        <span>Getting Started</span>
+        <span>User Guide</span>
             
                 <li class="toctree-l1 current">
-                    <a class="current" href=".">Getting Starting</a>
+                    <a class="current" href=".">Getting Started</a>
                     
                         <ul>
                         
                             <li class="toctree-l2"><a href="#getting-started">Getting started</a></li>
                             
+                                <li><a class="toctree-l3" href="#installation">Installation</a></li>
+                            
                                 <li><a class="toctree-l3" href="#using-projx-with-networkx">Using projx with NetworkX</a></li>
+                            
+                                <li><a class="toctree-l3" href="#using-the-etl-api">Using the ETL API</a></li>
                             
                         
                         </ul>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="../extending-etl">Extending the ETL</a>
                     
                 </li>
             
@@ -62,23 +71,23 @@
 
     
         
-            <li class="toctree-l1 ">
-                <a class="" href="../dsl">DSL</a>
-            </li>
-        
-
-    
-        
-            <li class="toctree-l1 ">
-                <a class="" href="../etl">ETL</a>
-            </li>
-        
-
-    
-        
-            <li class="toctree-l1 ">
-                <a class="" href="../api">API</a>
-            </li>
+        <span>API</span>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="../dsl">DSL</a>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="../etl">ETL</a>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="../api">nxprojx</a>
+                    
+                </li>
+            
         
 
     
@@ -102,7 +111,7 @@
           <div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="..">Docs</a> &raquo;</li>
-    <li>Getting Starting</li>
+    <li>Getting Started</li>
       <li class="wy-breadcrumbs-aside">
         
       </li>
@@ -113,8 +122,298 @@
             <div class="section">
               <h1 id="getting-started">Getting started</h1>
 <p><strong>A tour of projx</strong></p>
-<p>projx <strong>transforms</strong> graphs by taking a source graph as input, using it to produce a stream of data, and iteratively applying a series of changes to the data before storing it as a graph either in memory, or using a persistent data store like Neo4j. projx focuses on producing graph wide transformations  that operate over all nodes or edges of a certain type in a multipartite graph. This concept can be concisely demonstrated using the DSL to transform NetworkX graphs in memory.</p>
-<h2 id="using-projx-with-networkx"><a href="#nxdemo">Using projx with NetworkX</a></h2>
+<p><strong>projx transforms</strong> graphs. It takes a source graph as input, matches a traversal pattern, and generates a stream of data that is transformed and loaded into a NetworkX graph in memory or written to a persistent data store. <strong>projx</strong> focuses on producing graph wide transformations that operate over nodes and edges matching a traversal pattern in a multipartite graph. This concept can be concisely demonstrated using the DSL to transform NetworkX graphs in memory: <strong><a href="http://bit.ly/1EiMaMt">check out this demo IPython Notebook</a></strong> to see <strong>projx</strong> in action.</p>
+<h2 id="installation">Installation</h2>
+<p><strong>projx</strong> is available through <a href="https://pypi.python.org/pypi/projx">PyPi</a>, and can be installed with pip:</p>
+<pre><code class="bash">$ pip install projx
+</code></pre>
+
+<p>or feel free to fork or clone <a href="https://github.com/davebshow/projx">projx on github</a></p>
+<pre><code class="bash">$ git clone https://github.com/davebshow/projx.git
+</code></pre>
+
+<h2 id="using-projx-with-networkx">Using projx with NetworkX</h2>
+<h3 id="the-dsl">The DSL</h3>
+<p>The <strong>projx DSL</strong> is a declarative query language based on Neo4j's Cypher. It consists of MATCH statements and transformations. To use the it, first instantiate a projection of a multipartite NetworkX graph:</p>
+<pre><code class="python">import projx as px
+
+# This returns a multipartite networkx.Graph where each node has an
+# attribute &quot;type&quot;.
+graph = test_graph()
+p = px.Projection(graph)
+</code></pre>
+
+<h4 id="the-match-clause">The match clause</h4>
+<p>Then execute a MATCH statement written in the projx <a href="../dsl">DSL</a>:</p>
+<pre><code class="python"># This returns an instance of networkx.Graph
+p.execute(&quot;MATCH (m)-(n)&quot;)
+</code></pre>
+
+<p>The above match pattern will match all dyads (two nodes connected by an edge) in the graph. Notice there is no RETURN statement, the projx.Projection.execute builds and returns an instance of networkx.Graph that contains all paths matched by the match pattern.</p>
+<p>To match a subgraph of the original graph, we can limit our match pattern using criteria such as node type to only match a subset of paths. The following statement matches a path of all people who are connected through a city, and then returns a bipartite graph of people and the cities they are connected to:</p>
+<pre><code class="python"># This returns an instance of networkx.Graph
+p.execute(&quot;MATCH (p1:Person)-(c:City)-(p2:Person)&quot;)
+</code></pre>
+
+<p>Notice the syntax for denoting a node is quite simple, it consists of parenthesis containing an alias, a colon delimiter, and then a (p2:Person)node type (alias:NodeType).</p>
+<p>Edge type criteria can also be used in pattern matching. Observe:</p>
+<pre><code class="python"># This returns an instance of networkx.Graph
+p.execute(&quot;MATCH (p1:Person)-[l:lives_in]-(c:City)&quot;)
+</code></pre>
+
+<p>This statement only matches limits matching people and cities by the type of edge connecting them, in this case "lives in".</p>
+<p>See the <a href="../dsl">DSL</a> docs for a full description of match.</p>
+<h4 id="transformation-clauses">Transformation clauses</h4>
+<p>After we match a pattern, we would often like to transform it in some way or another. Taking the bipartite graph of types Person and City from above as an example, we may want to compress it into a one mode graph like a social network. <strong>projx</strong> makes this easy:</p>
+<pre><code class="python"># This returns a one mode social network of people who are associated through
+# nodes of type city.
+p.execute(&quot;&quot;&quot;
+    MATCH (p1:Person)-(c:City)-(p2:Person)
+    PROJECT (p1)-(p2)
+    DELETE c
+&quot;&quot;&quot;)
+</code></pre>
+
+<p>A transformation clause, in this case, MATCH takes a pattern similar to the match pattern as an argument. However, unlike the match pattern, the transformation pattern employs only the alias established by the match patter.</p>
+<p>Furthermore, we can specify attributes that we would like to set on the newly created elements (in the case of PROJECT, a new edge), nodes we would like to delete from the projection referenced simply through their alias, and special methods. The following demonstrates using a special method to make an edge weight calculation during the projection using the Newman technique:</p>
+<pre><code class="python">p.execute(&quot;&quot;&quot;
+    MATCH   (p1:Person)-(wild)-(p2:Person)
+    PROJECT (p1)-(p2)
+    METHOD JACCARD Institution, City
+    SET     name = wild.label
+    DELETE  wild
+&quot;&quot;&quot;)
+</code></pre>
+
+<p>Notice the method NEWMAN takes node types as arguments. These determine what sort of connections between people will be used in the edge weight calculation.</p>
+<p>The projx DSL also implements the transformations TRANSFER and COMBINE. For a full description of transformations and the DSL, please refer to the <a href="../dsl">DSL docs</a></p>
+<h3 id="etl">ETL</h3>
+<p>When you run the DSL, the first thing projx does is parse the query, producing a JSON structure that is the <strong>projx</strong> version of an ETL config file. This concept is based on orientdb-etl. The ETL is a simply a JSON config file or Python dict data structure. Here's an example of what the parser returns:</p>
+<pre><code class="python">print(json.dumps(px.parse_query((&quot;&quot;&quot;
+    MATCH   (p1:Person)-(wild)-(p2:Person)
+    PROJECT (p1)-(p2)
+    METHOD JACCARD Institution, City
+    SET     name = wild.label
+    DELETE  wild
+&quot;&quot;&quot;)), indent=2))
+
+{
+  &quot;extractor&quot;: {
+    &quot;networkx&quot;: {
+      &quot;type&quot;: &quot;subgraph&quot;,
+      &quot;traversal&quot;: [
+        {
+          &quot;node&quot;: {
+            &quot;alias&quot;: &quot;p1&quot;,
+            &quot;type&quot;: &quot;Person&quot;
+          }
+        },
+        {
+          &quot;edge&quot;: {}
+        },
+        {
+          &quot;node&quot;: {
+            &quot;alias&quot;: &quot;wild&quot;
+          }
+        },
+        {
+          &quot;edge&quot;: {}
+        },
+        {
+          &quot;node&quot;: {
+            &quot;alias&quot;: &quot;p2&quot;,
+            &quot;type&quot;: &quot;Person&quot;
+          }
+        }
+      ]
+    }
+  },
+  &quot;transformers&quot;: [
+    {
+      &quot;project&quot;: {
+        &quot;pattern&quot;: [
+          {
+            &quot;node&quot;: {
+              &quot;alias&quot;: &quot;p1&quot;
+            }
+          },
+          {
+            &quot;edge&quot;: {}
+          },
+          {
+            &quot;node&quot;: {
+              &quot;alias&quot;: &quot;p2&quot;
+            }
+          }
+        ],
+        &quot;set&quot;: [
+          {
+            &quot;value_lookup&quot;: &quot;wild.label&quot;,
+            &quot;key&quot;: &quot;name&quot;
+          }
+        ],
+        &quot;method&quot;: {
+          &quot;jaccard&quot;: {
+            &quot;args&quot;: [
+              &quot;Institution&quot;,
+              &quot;City&quot;
+            ]
+          }
+        },
+        &quot;delete&quot;: {
+          &quot;alias&quot;: [
+            &quot;wild&quot;
+          ]
+        }
+      }
+    }
+  ],
+  &quot;loader&quot;: {
+    &quot;nx2nx&quot;: {}
+  }
+}
+</code></pre>
+
+<p>This structure, which will be thoroughly addressed in the <a href="#using-the-etl-api">next section</a>, is then simply passed to the other main API function that executes the ETL pipeline:</p>
+<pre><code class="python">etl = px.parse_query(&quot;&quot;&quot;
+    MATCH   (p1:Person)-(wild)-(p2:Person)
+    PROJECT (p1)-(p2)
+    METHOD JACCARD Institution, City
+    SET     name = wild.label
+    DELETE  wild
+&quot;&quot;&quot;)
+# Main API function.
+subgraph = px.execute_etl(etl, g)
+</code></pre>
+
+<p>The following sections will detail the ETL, explaining how it is used with NetworkX <strong>and</strong> how it can be used to translate graph data to and from various data sources.</p>
+<h2 id="using-the-etl-api">Using the ETL API</h2>
+<p>The <strong>ETL API</strong> is simply a JSON configuration object passed to the ETL pipeline as show above. It has the advantage of being extremely simple, it requires little or no string construction and is easy to build programmatically. When transferring data between databases or flat files, this kind of configuration can be easily stored as a file and passed as a command line argument.</p>
+<p>At the same time, this type of object in infinitely extensible in that the developer can pass any arbitrary key/value pair necessary for custom components without disrupting other elements of the pipeline. Transformers are defined purely as JSON objects, while the rules for their parsing and execution are defined in the loader function. For a more complete explanation of the <strong>projx ETL</strong> see the <a href="../extending-etl">Extending the ETL section</a>.</p>
+<p>The ETL JSON consists of three objects: an extractor, transformers, and a loader. The extractor gets the necessary data to open a data stream from the data source and apply the transformations. The transformations are applied in a pipeline to the data stream generated by the extractor. The loader defines to where and how it will be loaded. Let's look at a couple examples of ETL configurations, one element at a time:</p>
+<h3 id="example-networkx-networkx-nx2nx">Example: NetworkX -&gt; NetworkX: nx2nx</h3>
+<p>Here we'll dissect a NetworkX to NetworkX ETL JSON configuration object. It all begins with an extractor:</p>
+<pre><code class="python">&quot;extractor&quot;: {
+    &quot;networkx&quot;: {
+        &quot;type&quot;: &quot;graph&quot;,
+        &quot;node_type_attr&quot;: &quot;type&quot;,
+        &quot;edge_type_attr&quot;: &quot;type&quot;,
+        &quot;traversal&quot;: [
+            {&quot;node&quot;: {&quot;alias&quot;: &quot;c&quot;, &quot;type&quot;: &quot;City&quot;}},
+            {&quot;edge&quot;: {}},
+            {&quot;node&quot;: {&quot;alias&quot;: &quot;i&quot;, &quot;type&quot;: &quot;Institution&quot;}}
+        ]
+    }
+}
+</code></pre>
+
+<p>This object provides the following information:</p>
+<ul>
+<li>The type of extractor to be used</li>
+<li>The type of projection (graph or subgraph)</li>
+<li>The name used to define the node type in the source graph</li>
+<li>The name used to define the node type in the source graph</li>
+<li>A traversal which defines the match pattern that will be executed on the source graph: all nodes of type "City" connected to nodes of type "Institution".</li>
+</ul>
+<p>Next, we define a list of transformations that will be performed upon the nodes returned by the match pattern:</p>
+<pre><code class="python">&quot;transformers&quot;: [
+    {&quot;transfer&quot;: {
+            &quot;pattern&quot;: [
+                {&quot;node&quot;: {&quot;alias&quot;: &quot;c&quot;}},
+                {&quot;edge&quot;: {}},
+                {&quot;node&quot;: {&quot;alias&quot;: &quot;i&quot;}}
+            ],
+            &quot;set&quot;: [
+                {&quot;key&quot;: &quot;city&quot;, &quot;value_lookup&quot;: &quot;c.label&quot;}
+            ],
+            &quot;method&quot;: {
+                &quot;edges&quot;: {
+                    &quot;args&quot;: [&quot;Person&quot;]
+                }
+            },
+            &quot;delete&quot;: {
+                &quot;alias&quot;: [&quot;c&quot;]
+            }
+        }
+    }
+],
+</code></pre>
+
+<p>This object provides a list of transformer that will be parsed by the loader. It includes:</p>
+<ul>
+<li>The name of the transformer</li>
+<li>The pattern, corresponding to the alias created in the extract object, which specifies the nodes on which the transformation will be performed</li>
+<li>The attribute key to be set, and the lookup based on node alias to populate the attribute values</li>
+<li>The method to be used in the transformation, in this case edges from nodes of type "Person" will be transfered to the destination nodes with alias "i"</li>
+<li>The nodes to be deleted, a simple list of node alias</li>
+</ul>
+<p>Finally, the loader object:</p>
+<pre><code class="python">&quot;loader&quot;: {
+    &quot;nx2nx&quot;: {}
+}
+</code></pre>
+
+<p>Nothing to it. Just specifies the name of the loader we will use. Notice that the loader specifies both the source and the target data "nx2nx". This is because, while extractors are specific only to their data source, loaders are the glue between the source and target, and are therefore couple to both. We will see this again in the following example, neo4j2nx.</p>
+<h3 id="example-neo4j-networkx-neo4j2nx">Example: Neo4j -&gt; NetworkX: neo4j2nx</h3>
+<p>Now let's look at the ETL for a Neo4j to NetworkX transformation. We'll use a database loaded with smoothie recipes. It is a simple bipartite graph in which nodes of type Ingredient are connect to nodes of type Recipe. Examine the extractor:</p>
+<pre><code class="python">&quot;extractor&quot;: {
+    &quot;neo4j&quot;: {
+        &quot;query&quot;: &quot;match (n:Ingredient)--(r:Recipe)--(m:Ingredient) return n, r, m&quot;,
+        &quot;source&quot;: &quot;http://localhost:7474/db/data/&quot;
+    }
+}
+</code></pre>
+
+<p>The following information is provided:</p>
+<ul>
+<li>The type of extractor (neo4j)</li>
+<li>The query to be executed on the database.</li>
+<li>The url required to connect to a running instance of Neo4j</li>
+</ul>
+<p>The transformers are equally simple. They simply map this data to a NetworkX graph held in memory. The following are examples of transformers used with the neo4j2nx_loader:</p>
+<pre><code class="python">&quot;transformers&quot;: [
+    {&quot;node&quot;: {
+        &quot;pattern&quot;: [{&quot;node&quot;: {&quot;alias&quot;: &quot;n&quot;, &quot;unique&quot;: &quot;UniqueId&quot;}}],
+        &quot;set&quot;: [
+            {&quot;key&quot;: &quot;name&quot;, &quot;value_lookup&quot;: &quot;n.UniqueId&quot;},
+            {&quot;key&quot;: &quot;type&quot;, &quot;value&quot;: &quot;Ingredient&quot;}
+        ]
+    }}
+
+    {&quot;edge&quot;: {
+        &quot;pattern&quot;: [
+            {&quot;node&quot;: {&quot;alias&quot;: &quot;n&quot;, &quot;unique&quot;: &quot;UniqueId&quot;}},
+            {&quot;edge&quot;: {}},
+            {&quot;node&quot;: {&quot;alias&quot;: &quot;m&quot;, &quot;unique&quot;: &quot;UniqueId&quot;}}
+        ],
+        &quot;set&quot;: [
+            {&quot;key&quot;: &quot;name&quot;, &quot;value_lookup&quot;: &quot;r.UniqueId&quot;}
+        ],
+    }}
+]
+
+</code></pre>
+
+<p>Like the nx2nx transformers, they provide the following information:</p>
+<ul>
+<li>
+<p>The transformer keyword (node or edge)</p>
+</li>
+<li>
+<p>A pattern: a list of nodes and edges representing the pattern used in the transformer. Notice with neo4j2nx we have to specify the attribute representing the unique id that will be used as the NetworkX node index in graph creation</p>
+</li>
+<li>
+<p>Attributes to be set on the newly created node or edge</p>
+</li>
+</ul>
+<p>Finally, the loader is exceedingly simple, just declaring the name of the loader to be used:</p>
+<pre><code class="python">&quot;loader&quot;: {
+    &quot;neo4j2nx&quot;: {}
+}
+</code></pre>
+
+<p>Check out this <a href="http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_neo4j_demo.ipynb">demo notebook</a> for some more examples of neo4j2nx.</p>
+<h3 id="phew-still-want-more-in-the-next-section-we-pick-apart-the-etl-pipeline-and-learn-how-to-extend-it-with-custom-components">Phew! Still want more? In the <a href="../extending-etl">next section</a>, we pick apart the ETL pipeline and learn how to extend it with custom components.</h3>
 
             </div>
           </div>
@@ -122,7 +421,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../dsl" class="btn btn-neutral float-right" title="DSL"/>Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../extending-etl" class="btn btn-neutral float-right" title="Extending the ETL"/>Next <span class="icon icon-circle-arrow-right"></span></a>
       
       
         <a href=".." class="btn btn-neutral" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
@@ -152,7 +451,7 @@
     <span class="rst-current-version" data-toggle="rst-current-version">
         
       <span><a href=".." style="color: #fcfcfc;">&laquo; Previous</a></span>
-      <span style="margin-left: 15px"><a href="../dsl" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span style="margin-left: 15px"><a href="../extending-etl" style="color: #fcfcfc">Next &raquo;</a></span>
     </span>
 </div>
 </body>
