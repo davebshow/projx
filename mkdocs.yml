@@ -6,4 +6,3 @@ pages:
 - [dsl.md, API, DSL]
 - [etl.md, API, ETL]
 - [api.md, API, nxprojx]
-theme: readthedocs
