@@ -1,92 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+These are the core functions/classes for interacting with NetworkX.
+"""
 from itertools import chain
 import networkx as nx
-
-
-class Record(object):
-
-    def __init__(self, path, alias):
-        self._list = path
-        self._dict = {}
-        for i in range(len(path)):
-            self._dict[alias[i]] = path[i]
-
-    def __getitem__(self, item):
-        if isinstance(item, str):
-            return self._dict[item]
-        elif isinstance(item, int):
-            return self._list[item]
-        else:
-            raise Exception("Bad index.")
-
-
-class NXProjector(object):
-    def __init__(self, id_counter):
-        """
-        This class holds the info and methods necessary for performing the ETL
-        actions on a networkx.Graph. It is not a wrapper, and does not store
-        the actual graph, just operates on it..
-
-        :param id_counter: Int. Used to handle combine ids.
-
-        """
-        self._id_counter = id_counter
-        self._transformation = {}
-        self._transformation_init()
-
-    def transformation_wrapper(self, verb):
-        """
-        Wraps the transformation methods and adds them to the transformations
-        dictionary.
-
-        :param verb: Str. The ProjX verb assiociated with the wrapped
-        function.
-        """
-        def wrapper(fn):
-            self._transformation[verb] = fn
-        return wrapper
-
-    def _get_transformation(self):
-        """
-        Return transformation for transformation property.
-
-        :returns: Dict. A dict containing a mapping of verbs to transformation
-            methods.
-        """
-        return self._transformation
-    transformations = property(fget=_get_transformation)
-
-    def _transformation_init(self):
-        """
-        A series of functions representing transformations. These are
-        wrapped by the transformation wrapper and added to the transformations
-        dict. Later during the parsing and execution phase these are called as
-        pointers to the various graph transformation methods
-        (transfer and project).
-        """
-        @self.transformation_wrapper("project")
-        def execute_project(source, target, graph, attrs, node_type_attr,
-                            edge_type_attr, **kwargs):
-            method = kwargs.get("method", {})
-            params = kwargs.get("params", [])
-            return project(source, target, graph, method, params, attrs,
-                           node_type_attr, edge_type_attr)
-
-        @self.transformation_wrapper("transfer")
-        def execute_transfer(source, target, graph, attrs, node_type_attr,
-                             edge_type_attr, **kwargs):
-            method = kwargs.get("method", {})
-            params = kwargs.get("params", [])
-            return transfer(source, target, graph, method, params, attrs,
-                            node_type_attr, edge_type_attr)
-
-        @self.transformation_wrapper("combine")
-        def execute_combine(source, target, graph, attrs, node_type_attr,
-                            edge_type_attr, **kwargs):
-            self._id_counter += 1
-            node_id = int(self._id_counter)
-            return combine(source, target, graph, node_id, attrs,
-                           node_type_attr, edge_type_attr)
 
 
 def reset_index(graph):
@@ -121,8 +38,8 @@ def match(node_type_seq, edge_type_seq, graph, node_alias=None,
     return paths
 
 
-def project(source, target, graph, method="jaccard", params=[], attrs={},
-            node_type_attr="type", edge_type_attr="type", **kwargs):
+def project(source, target, graph, method="jaccard", params=None, attrs=None,
+            node_type_attr="type", edge_type_attr="type"):
     """
     Executes graph "PROJECT" projection.
 
@@ -133,6 +50,10 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
+    if params is None:
+        params = []
+    if attrs is None:
+        attrs = {}
     if method in ["jaccard", "newman"]:
         snbrs = {node for node in graph[source].keys()
                  if graph.node[node][node_type_attr] in params}
@@ -157,7 +78,7 @@ def project(source, target, graph, method="jaccard", params=[], attrs={},
     return graph
 
 
-def transfer(source, target, graph, method="edges", params=[], attrs={},
+def transfer(source, target, graph, method="edges", params=None, attrs=None,
              node_type_attr="type", edge_type_attr="type", **kwargs):
     """
     Execute a graph "TRANSFER" projection.
@@ -169,6 +90,10 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
+    if params is None:
+        params = []
+    if attrs is None:
+        attrs = {}
     if method == "edges":
         nbrs = {k: v for (k, v) in graph[source].items()
                 if graph.node[k][node_type_attr] in params}
@@ -182,7 +107,7 @@ def transfer(source, target, graph, method="edges", params=[], attrs={},
     return graph
 
 
-def combine(source, target, graph, node_id="", attrs={},
+def combine(source, target, graph, node_id="", attrs=None,
             node_type_attr="type", edge_type_attr="type"):
 
     """
@@ -196,6 +121,8 @@ def combine(source, target, graph, node_id="", attrs={},
     :returns: networkx.Graph. A projected copy of the wrapped graph
     or its subgraph.
     """
+    if attrs is None:
+        attrs = {}
     if not node_id:
         try:
             node_id = max(graph.nodes())
@@ -296,7 +223,7 @@ def traverse(start, node_type_seq, edge_type_seq, graph,
     return paths
 
 
-def build_subgraph(paths, graph):
+def build_subgraph(paths, graph, records=False):
     """
     Takes the paths returned by match and builds a graph.
     :param paths: List of lists.
@@ -304,6 +231,8 @@ def build_subgraph(paths, graph):
     """
     g = nx.Graph()
     for path in paths:
+        if records:
+            path = path._list
         combined_paths = _combine_paths(path)
         for edges in combined_paths:
             attrs = graph[edges[0]][edges[1]]
@@ -311,27 +240,6 @@ def build_subgraph(paths, graph):
     for node in g.nodes():
         g.node[node] = dict(graph.node[node])
     return g
-
-
-def _add_edges_from(graph, edges, edge_type_attr="type"):
-    """
-    An alternative to the networkx.Graph.add_edges_from.
-    Handles non-reserved attributes as sets.
-
-    :param graph: networkx.Graph
-    :param edges: List of tuples. Tuple contains two node ids Int and an
-    attr Dict.
-    """
-    for source, target, attrs in edges:
-        if graph.has_edge(source, target):
-            edge_attrs = graph[source][target]
-            merged_attrs = merge_attrs(attrs, edge_attrs,
-                                        [edge_type_attr, "weight", "label"])
-            graph.adj[source][target] = merged_attrs
-            graph.adj[target][source] = merged_attrs
-        else:
-            graph.add_edge(source, target, attrs)
-    return graph
 
 
 def merge_attrs(new_attrs, old_attrs, reserved=[]):
@@ -370,6 +278,113 @@ def merge_attrs(new_attrs, old_attrs, reserved=[]):
             elif isinstance(v, str) or isinstance(v, unicode):
                 attrs[k] = {v: 1}
     return attrs
+
+
+class NXProjector(object):
+    def __init__(self, id_counter):
+        """
+        This class holds the info and methods necessary for performing the ETL
+        actions on a networkx.Graph. It is not a wrapper, and does not store
+        the actual graph, just operates on it..
+
+        :param id_counter: Int. Used to handle combine ids.
+
+        """
+        self._id_counter = id_counter
+        self._transformation = {}
+        self._transformation_init()
+
+    def transformation_wrapper(self, verb):
+        """
+        Wraps the transformation methods and adds them to the transformations
+        dictionary.
+
+        :param verb: Str. The ProjX verb assiociated with the wrapped
+        function.
+        """
+        def wrapper(fn):
+            self._transformation[verb] = fn
+        return wrapper
+
+    def _get_transformation(self):
+        """
+        Return transformation for transformation property.
+
+        :returns: Dict. A dict containing a mapping of verbs to transformation
+            methods.
+        """
+        return self._transformation
+    transformations = property(fget=_get_transformation)
+
+    def _transformation_init(self):
+        """
+        A series of functions representing transformations. These are
+        wrapped by the transformation wrapper and added to the transformations
+        dict. Later during the parsing and execution phase these are called as
+        pointers to the various graph transformation methods
+        (transfer and project).
+        """
+        @self.transformation_wrapper("project")
+        def execute_project(source, target, graph, attrs, node_type_attr,
+                            edge_type_attr, **kwargs):
+            method = kwargs.get("method", {})
+            params = kwargs.get("params", [])
+            return project(source, target, graph, method, params, attrs,
+                           node_type_attr, edge_type_attr)
+
+        @self.transformation_wrapper("transfer")
+        def execute_transfer(source, target, graph, attrs, node_type_attr,
+                             edge_type_attr, **kwargs):
+            method = kwargs.get("method", {})
+            params = kwargs.get("params", [])
+            return transfer(source, target, graph, method, params, attrs,
+                            node_type_attr, edge_type_attr)
+
+        @self.transformation_wrapper("combine")
+        def execute_combine(source, target, graph, attrs, node_type_attr,
+                            edge_type_attr, **kwargs):
+            self._id_counter += 1
+            node_id = int(self._id_counter)
+            return combine(source, target, graph, node_id, attrs,
+                           node_type_attr, edge_type_attr)
+
+
+class Record(object):
+
+    def __init__(self, path, alias):
+        self._list = path
+        self._dict = {}
+        for i in range(len(path)):
+            self._dict[alias[i]] = path[i]
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self._dict[item]
+        elif isinstance(item, int):
+            return self._list[item]
+        else:
+            raise Exception("Bad index.")
+
+
+def _add_edges_from(graph, edges, edge_type_attr="type"):
+    """
+    An alternative to the networkx.Graph.add_edges_from.
+    Handles non-reserved attributes as sets.
+
+    :param graph: networkx.Graph
+    :param edges: List of tuples. Tuple contains two node ids Int and an
+    attr Dict.
+    """
+    for source, target, attrs in edges:
+        if graph.has_edge(source, target):
+            edge_attrs = graph[source][target]
+            merged_attrs = merge_attrs(attrs, edge_attrs,
+                                        [edge_type_attr, "weight", "label"])
+            graph.adj[source][target] = merged_attrs
+            graph.adj[target][source] = merged_attrs
+        else:
+            graph.add_edge(source, target, attrs)
+    return graph
 
 
 def _combine_paths(path):

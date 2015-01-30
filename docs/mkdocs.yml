@@ -1,0 +1,9 @@
+site_name: projx
+pages:
+- [index.md, Home]
+- [getting-started.md, User Guide, Getting Started]
+- [extending-etl.md, User Guide, Extending the ETL]
+- [dsl.md, API, DSL]
+- [etl.md, API, ETL]
+- [api.md, API, nxprojx]
+theme: readthedocs

@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
-from modules import loaders, neo4jxtrct, nxxtrct
+"""
+ETL does initial validation on config JSON and provides the extractor function,
+stream function, list of transformers (JSON), the loader JSON, and graph object
+for the loader pipeline.
+"""
+from modules import loaders, neo4j_xtrct, nx_xtrct
 
 
 class ETL(object):
 
-    def __init__(self, etl):
+    def __init__(self, etl, extractors=None, streams=None, loaders=None):
         """
         A helper class that parses the ETL JSON, and initializes the
         required extractor, transformers, and loader. Also store key
@@ -14,8 +19,8 @@ class ETL(object):
         """
         # Get the extractor info.
         try:
-            self._extractor = etl["extractor"]
-            self.extractor_name = self._extractor.keys()[0]
+            self.extractor_json = etl["extractor"]
+            self.extractor_name = self.extractor_json.keys()[0]
         except (KeyError, IndexError):
             raise Exception("Please define valid extractor")
 
@@ -24,14 +29,16 @@ class ETL(object):
 
         # Get the loader info.
         try:
-            self._loader = etl["loader"]
-            self.loader_name = self._loader.keys()[0]
+            self.loader_json = etl["loader"]
+            self.loader_name = self.loader_json.keys()[0]
         except (KeyError, IndexError):
             raise Exception("Please define valid loader.")
 
         # Validate the extractor function.
         self._extractors = {}
         self._init_extractors()
+        if extractors:
+            pass
         try:
             self.extractor = self.extractors[self.extractor_name]
         except KeyError:
@@ -42,6 +49,8 @@ class ETL(object):
         # Validate the extractor function.
         self._streams = {}
         self._init_streams()
+        if streams:
+            pass
         try:
             self.stream = self.streams[self.extractor_name]
         except KeyError:
@@ -52,6 +61,8 @@ class ETL(object):
         # Validate the loader function.
         self._loaders = {}
         self._init_loaders()
+        if loaders:
+            pass
         try:
             self.loader = self.loaders[self.loader_name]
         except KeyError:
@@ -84,14 +95,18 @@ class ETL(object):
             :param graph: networkx.Graph
             :returns: projx.nx_extractor
             """
-            return nxxtrct.nx_extractor(self._extractor[self.extractor_name], graph)
+            return nx_xtrct.nx_extractor(
+                self.extractor_json[self.extractor_name], graph
+            )
 
         @self.extractors_wrapper("neo4j")
         def get_neo4j_extractor(graph):
             """
             :returns: projx.nx_extractor
             """
-            return neo4jxtrct.neo4j_extractor(self._extractor[self.extractor_name], graph)
+            return neo4j_xtrct.neo4j_extractor(
+                self.extractor_json[self.extractor_name], graph
+            )
 
 
     def _get_streams(self):
@@ -119,7 +134,15 @@ class ETL(object):
             :param graph: networkx.Graph
             :returns: projx.nx_extractor
             """
-            return nxxtrct.nx_stream(extractor_context, graph)
+            return nx_xtrct.nx_stream(extractor_context, graph)
+
+        @self.streams_wrapper("neo4j")
+        def get_neo4j_stream(extractor_context, graph):
+            """
+            :param graph: networkx.Graph
+            :returns: projx.nx_extractor
+            """
+            return neo4j_xtrct.neo4j_stream(extractor_context, graph)
 
 
     def _get_loader(self):
@@ -145,7 +168,8 @@ class ETL(object):
             :returns: projx.nx_loader
             """
             return loaders.nx2nx_loader(extractor, stream, transformers,
-                                      self._loader[self.loader_name], graph)
+                                        self.loader_json[self.loader_name],
+                                        graph)
 
         @self.loaders_wrapper("neo4j2nx")
         def get_neo4j2nx_loader(extractor, stream, transformers, graph):
@@ -156,18 +180,22 @@ class ETL(object):
             :returns: projx.nx_loader
             """
             return loaders.neo4j2nx_loader(extractor, stream, transformers,
-                                            self._loader[self.loader_name],
+                                            self.loader_json[self.loader_name],
                                             graph)
 
 
         @self.loaders_wrapper("neo4j2edgelist")
-        def get_neo4j2edgelist_loader(transformers, extractor, graph):
+        def get_neo4j2edgelist_loader(extractor, stream, transformers, graph):
             """
             :param tranformers: List of dicts.
             :extractor: function.
             :param graph: networkx.Graph
             :returns: projx.nx_loader
             """
-            return loaders.neo4j2edgelist_loader(transformers, extractor,
-                                                  self._loader[self.loader_name],
-                                                  graph)
+            return loaders.neo4j2edgelist_loader(
+                extractor,
+                stream,
+                transformers,
+                self.loader_json[self.loader_name],
+                graph
+            )

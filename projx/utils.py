@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+These are mainly for testing/demoing the library.
+"""
 import networkx as nx
 
 
@@ -49,40 +52,40 @@ def test_graph():
 project_etl = {
     "extractor": {
         "networkx": {
-            "type": "subgraph", 
+            "type": "subgraph",
             "node_type_attr": "type",
             "edge_type_attr": "type",
             "traversal": [
-                {"node": { "alias": "p1", "type": "Person"}}, 
-                {"edge": {}}, 
-                {"node": {"alias": "wild"}}, 
-                {"edge": {}}, 
+                {"node": { "alias": "p1", "type": "Person"}},
+                {"edge": {}},
+                {"node": {"alias": "wild"}},
+                {"edge": {}},
                 {"node": {"alias": "p2", "type": "Person"}}
             ]
         }
-    }, 
+    },
     "transformers": [
         {
             "project": {
                 "pattern": [
-                    {"node": {"alias": "p1"}}, 
-                    {"edge": {}}, 
+                    {"node": {"alias": "p1"}},
+                    {"edge": {}},
                     {"node": {"alias": "p2"}}
-                ], 
+                ],
                 "set": [
                     {"key": "name", "value_lookup": "wild.label"}
-                ], 
+                ],
                 "method": {
                     "jaccard": {
                         "args": ["Institution", "City"]
                     }
-                }, 
+                },
                 "delete": {
                     "alias": ["wild"]
                 }
             }
         }
-    ], 
+    ],
     "loader": {
         "nx2nx": {}
     }
@@ -92,50 +95,50 @@ project_etl = {
 transfer_etl = {
     "extractor": {
         "networkx": {
-            "type": "graph", 
+            "type": "graph",
             "node_type_attr": "type",
             "edge_type_attr": "type",
             "traversal": [
                 {
                     "node": {
-                        "alias": "c", 
+                        "alias": "c",
                         "type": "City"
                     }
-                }, 
+                },
                 {
                     "edge": {}
-                }, 
+                },
                 {
                     "node": {
-                        "alias": "i", 
+                        "alias": "i",
                         "type": "Institution"
                     }
                 }
             ]
         }
-    }, 
+    },
     "transformers": [
         {
             "transfer": {
                 "pattern": [
-                    {"node": {"alias": "c"}}, 
-                    {"edge": {}}, 
+                    {"node": {"alias": "c"}},
+                    {"edge": {}},
                     {"node": {"alias": "i"}}
-                ], 
+                ],
                 "set": [
                     {"key": "city", "value_lookup": "c.label"}
-                ], 
+                ],
                 "method": {
                     "edges": {
                         "args": ["Person"]
                     }
-                }, 
+                },
                 "delete": {
                     "alias": ["c"]
                 }
             }
         }
-    ], 
+    ],
     "loader": {
         "nx2nx": {}
     }
@@ -228,23 +231,23 @@ multi_transform_etl = {
             }
         },
         {
-            "transfer": {
+            "project": {
                 "delete": {
                     "alias": [
                         "i"
                     ]
                 },
                 "method": {
-                    "edges": {
+                    "jaccard": {
                         "args": [
-                            "City"
+                            "Institution"
                         ]
                     }
                 },
                 "pattern": [
-                    {"node": {"alias": "i"}},
+                    {"node": {"alias": "p1"}},
                     {"edge": {}},
-                    {"node": {"alias": "p1"}}
+                    {"node": {"alias": "c"}}
                 ],
                 "set": [{}]
             }
@@ -256,9 +259,11 @@ multi_transform_etl = {
 neo4j2nx_etl = {
     "extractor": {
         "neo4j": {
-            "query": "match (n)--(r:Recipe)--(m) return n, r, m"
+            "query": "match (n)--(r:Recipe)--(m) return n, r, m",
+            "source": "http://localhost:7474/db/data/"
         }
-    }, 
+
+    },
     "transformers": [
         {
             "node": {
@@ -281,16 +286,16 @@ neo4j2nx_etl = {
         {
             "edge": {
                 "pattern": [
-                    {"node": {"alias": "n", "unique": "UniqueId"}}, 
-                    {"edge": {}}, 
+                    {"node": {"alias": "n", "unique": "UniqueId"}},
+                    {"edge": {}},
                     {"node": {"alias": "m", "unique": "UniqueId"}}
-                ], 
+                ],
                 "set": [
                     {"key": "name", "value_lookup": "r.UniqueId"}
-                ], 
+                ],
             }
         }
-    ], 
+    ],
     "loader": {
         "neo4j2nx": {}
     }
@@ -302,7 +307,7 @@ neo4j2edgelist_etl = {
         "neo4j": {
             "query": "match (n)--(r:Recipe)--(m) return n, r, m"
         }
-    }, 
+    },
     "transformers": [
         {
             "node": {
@@ -325,16 +330,16 @@ neo4j2edgelist_etl = {
         {
             "edge": {
                 "pattern": [
-                    {"node": {"alias": "n", "unique": "UniqueId"}}, 
-                    {"edge": {}}, 
+                    {"node": {"alias": "n", "unique": "UniqueId"}},
+                    {"edge": {}},
                     {"node": {"alias": "m", "unique": "UniqueId"}}
-                ], 
+                ],
                 "set": [
                     {"key": "name", "value_lookup": "r.UniqueId"}
-                ], 
+                ],
             }
         }
-    ], 
+    ],
     "loader": {
         "neo4j2edgelist": {"delim": ",", "filename": "demo.csv", "newline": "\n"}
     }

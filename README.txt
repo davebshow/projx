@@ -2,16 +2,16 @@
 projx - Graph transformations in Python
 =======================================
 
-**Alpha Version API breaking changes may occur over the next several months.**  
+**alpha**
 
-projx provides two ways to interact with graphs: 
-- A DSL based on Neo4j Cypher for executing graph transformations using a Python DB like API. 
-- A programmatic api that consumes JSON ETL configuration objects and executes graph transformations. Based on orientdb-etl.  
+**projx** provides a simple and extensible API for interacting with graphs in Python. Its core functionality is built around making graph transformations in-memory using the NetworkX module and a DSL based on Neo4j's Cypher] query language. It also provides an extensible ETL pipeline that uses JSON config (roughly modeled after orientdb-etl) to translate graph data between various persistent and in-memory representations.
 
-Currently only supports networkx.Graph  
+**Official Documentation: http://projx.readthedocs.org/en/latest/**  
 
-- Example Notebook: http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_demo.ipynb   
+**projx on PyPI: https://pypi.python.org/pypi/projx**  
 
-- Real docs coming soon at: http://projx.readthedocs.org/en/latest/#
+**Demo Notebook with NetworkX DSL: http://bit.ly/1EiMaMt**  
+
+**Demo Notebook with Neo4j2NetworkX: http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_neo4j_demo.ipynb**  
 
 Thanks to @versae for inspiring this project.

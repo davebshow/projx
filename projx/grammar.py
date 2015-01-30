@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+"""
+Parses the projx NetworkX DSL.
+"""
 from itertools import cycle, islice
 from pyparsing import (Word, alphanums, ZeroOrMore,
                        stringEnd, Suppress, Literal, CaselessKeyword,
