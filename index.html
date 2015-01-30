@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>projx</title>
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="./css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="./css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="./css/highlight.css">
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script>
+  <script type="text/javascript" src="./js/highlight.pack.js"></script>
+  <script src="./js/theme.js"></script>
+
+  <style>
+    body {font-size: 90%;}
+    pre, code {font-size: 100%;}
+    h3, h4, h5, h6 {color: #2980b9; font-weight: 300}
+  </style> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="." class="icon icon-home"> projx</a>
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+      <ul class="current">
+    
+        
+        <span>User Guide</span>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="getting-started/">Getting Started</a>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="extending-etl/">Extending the ETL</a>
+                    
+                </li>
+            
+        
+
+    
+        
+        <span>API</span>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="dsl/">DSL</a>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="etl/">ETL</a>
+                    
+                </li>
+            
+                <li class="toctree-l1 ">
+                    <a class="" href="api/">nxprojx</a>
+                    
+                </li>
+            
+        
+
+    
+</ul>
+
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="icon icon-reorder"></i>
+        <a href="."></a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".">Docs</a> &raquo;</li>
+    <li>Home</li>
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              <h1 id="projx-graph-transformations-in-python">projx - Graph transformations in Python.</h1>
+<p><strong>alpha</strong></p>
+<p><strong>projx</strong> provides a simple and extensible API for interacting with graphs in Python. Its core functionality is built around making graph transformations in memory using the <a href="https://networkx.github.io/">NetworkX</a> module and a DSL based on <a href="http://neo4j.com/">Neo4j's</a> <a href="http://neo4j.com/docs/stable/cypher-query-lang.html">Cypher</a> query language. It also provides an extensible ETL pipeline that uses JSON config (roughly modeled after <a href="https://github.com/orientechnologies/orientdb-etl/wiki">orientdb-etl</a>) to translate graph data between various persistent and in-memory representations.</p>
+<p><strong><a href="https://pypi.python.org/pypi/projx">projx on PyPI</a></strong></p>
+<p><strong><a href="http://bit.ly/1EiMaMt">Demo Notebook with NetworkX DSL</a></strong></p>
+<p><strong><a href="http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_neo4j_demo.ipynb">Demo Notebook with Neo4j2NetworkX</a></strong></p>
+<p>Thanks to <a href="https://github.com/versae">@versae</a> for inspiring this project.</p>
+<p><strong>For a quick tour, check out <a href="getting-started/">getting started</a>.</strong></p>
+
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="getting-started/" class="btn btn-neutral float-right" title="Getting Started"/>Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+    <!-- Copyright etc -->
+    </p>
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+        
+      <span><a href="" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      <span style="margin-left: 15px"><a href="getting-started/" style="color: #fcfcfc">Next &raquo;</a></span>
+    </span>
+</div>
+</body>
+</html>
