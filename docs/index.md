@@ -12,7 +12,7 @@
 
 
 
-**Some other relative links:**
+**Some other relevant links:**
 
 projx on [PyPI](https://pypi.python.org/pypi/projx)
 
