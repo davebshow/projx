@@ -48,9 +48,36 @@ def nx_stream(transformers, extractor_json):
     :param paths: List of lists.
     :returns: networkx.Graph
     """
+    graph = extractor_json["graph"]
     paths = extractor_json["paths"]
     for record in paths:
         for transformer in transformers:
             trans_kwrd = transformer.keys()[0]
             trans = transformer[trans_kwrd]
-            yield record, trans_kwrd, trans
+            to_set = trans.get("set", [])
+            attrs = _nx_lookup_attrs(to_set, record, graph)
+            yield record, trans_kwrd, trans, attrs
+
+
+def _nx_lookup_attrs(to_set, record, graph):
+    """
+    Helper to get attrs based on set input.
+
+    :param node_alias: Dict.
+    :param graph: networkx.Graph
+    :param to_set: List of dictionaries.
+    :param path: List.
+    :returns: Dict.
+    """
+    attrs = {}
+    for i, attr in enumerate(to_set):
+        key = attr.get("key", i)
+        value = attr.get("value", "")
+        if not value:
+            lookup = attr.get("value_lookup", "")
+            if lookup:
+                alias, lookup_key = lookup.split(".")
+                node = record[alias]
+                value = graph.node[node].get(lookup_key, "")
+        attrs[key] = value
+    return attrs

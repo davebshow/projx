@@ -6,8 +6,14 @@ the particulars of extracting the necessary data from the stream, taking into
 account the particularities of the source and loading/writing to the
 destination.
 """
+import time
 import networkx as nx
 from projx import nxprojx
+from nx_xtrct import _nx_lookup_attrs
+try:
+    from py2neo import Graph
+except ImportError:
+    print("Install py2neo to use Neo4j module.")
 
 
 def nx2nx_loader(extractor, stream, transformers, loader_json, graph):
@@ -24,16 +30,14 @@ def nx2nx_loader(extractor, stream, transformers, loader_json, graph):
         removals = set()
         projector = nxprojx.NXProjector(max(graph.nodes()))
         for trans in stream(transformers, extractor_json):
-            record, trans_kwrd, trans = trans
-            to_set = trans.get("set", [])
+            record, trans_kwrd, trans, attrs = trans
             method = trans.get("method", {"none": []})
             method_kwrd = method.keys()[0]
             params = method.get(method_kwrd, {"args": []})["args"]
-            attrs = _nx_lookup_attrs(to_set, record, graph)
             src, target, to_del = _apply_nx2nx_transformer(trans, record)
             fn = projector.transformations[trans_kwrd]
             graph = fn(src, target, graph, attrs, node_type_attr,edge_type_attr,
-                       method=method, params=params)
+                       method=method_kwrd, params=params)
             for i in to_del:
                 removals.update([i])
         graph.remove_nodes_from(removals)
@@ -70,7 +74,7 @@ def nx2nx_single_transform_loader(transformer, paths, graph, node_type_attr,
         attrs = _nx_lookup_attrs(to_set, record, graph)
         src, target, to_del = _apply_nx2nx_transformer(trans, record)
         graph = fn(src, target, graph, attrs, node_type_attr, edge_type_attr,
-                   method=method, params=params)
+                   method=method_kwrd, params=params)
         for i in to_del:
             removals.update([i])
     graph.remove_nodes_from(removals)
@@ -82,9 +86,7 @@ def neo4j2nx_loader(extractor, stream, transformers, loader_json, graph):
     extractor_json = extractor(graph)
     if len(transformers) > 0:
         for trans in stream(transformers, extractor_json):
-            record, trans_kwrd, trans = trans
-            to_set = trans.get("set", [])
-            attrs = _neo4j_lookup_attrs(to_set, record)
+            record, trans_kwrd, trans, attrs = trans
             pattern = trans.get("pattern", [])
             if trans_kwrd == "node":
                 try:
@@ -118,7 +120,7 @@ def neo4j2edgelist_loader(extractor, stream, transformers, loader_json, graph):
     if len(transformers) > 0:
         with open(filename, "w") as f:
             for trans in stream(transformers, extractor_json):
-                record, trans_kwrd, trans = trans
+                record, trans_kwrd, trans, _ = trans
                 pattern = trans.get("pattern", [])
                 if trans_kwrd == "edge":
                     source, target = _neo4j_get_source_target(record, pattern)
@@ -126,6 +128,66 @@ def neo4j2edgelist_loader(extractor, stream, transformers, loader_json, graph):
                     f.write(line)
     else:
         raise Exception("Please define transformation(s).")
+
+
+def edgelist2neo4j_loader(extractor, stream, transformers, loader_json, graph):
+    from datetime import datetime
+    start = datetime.now()
+    extractor_json = extractor(graph)
+    uri = loader_json.get("uri", "http://localhost:7474/db/data")
+    stmt_per_req = loader_json.get("stmt_per_req", 500)
+    req_per_tx = loader_json.get("req_per_tx", 10)
+    output_graph = Graph(uri)
+    statements = 0
+    requests = 0
+    edges = 0
+    tx = output_graph.cypher.begin()
+    for trans in stream(transformers, extractor_json):
+        record, trans_kwrd, trans, attrs = trans
+        pattern = trans.get("pattern", [])
+        if trans_kwrd == "node":
+            try:
+                node = pattern[0].get("node", {})
+                alias = node.get("alias", "")
+            except (IndexError, KeyError):
+                raise Exception("Invalid transformation pattern.")
+            statement = "MERGE (n {UniqueId: {N}})"
+            tx.append(statement, {"N": record[alias]})
+            statements += 1
+        elif trans_kwrd == "edge":
+            try:
+                source, target = [p["node"]["alias"] for p in pattern[0::2]]
+                edge = pattern[1]["edge"].get("type", "IN")
+            except (ValueError, KeyError):
+                raise Exception("Invalid pattern")
+            statement = """
+                MERGE (n: A {UniqueId: {N}})
+                WITH n
+                MERGE (m: B {UniqueId: {M}})
+                WITH n, m
+                MERGE (n)-[:IN]-(m);"""
+            tx.append(statement, {"N": record[source], "M": record[target]})
+            statements += 1
+        if statements == stmt_per_req:
+            tx.process()
+            edges += stmt_per_req
+            requests += 1
+            print("Processed {0} statements".format(stmt_per_req))
+            current = datetime.now() - start
+            print("Total edges processed: {0} in {1}".format(edges, current))
+            statements = 0
+            if requests == req_per_tx:
+                tx.commit()
+                tx = output_graph.cypher.begin()
+                print("Commited {0} requests of {1} statements".format(
+                    req_per_tx, stmt_per_req
+                ))
+                requests = 0
+    if not tx.finished:
+        tx.commit()
+    finish = datetime.now()
+    print("Load complete: {0} edges in {1}".format(edges, finish - start))
+
 
 
 def _apply_nx2nx_transformer(trans, record):
@@ -153,30 +215,6 @@ def _nx_get_source_target(pattern, record):
     return source, target
 
 
-def _nx_lookup_attrs(to_set, record, graph):
-    """
-    Helper to get attrs based on set input.
-
-    :param node_alias: Dict.
-    :param graph: networkx.Graph
-    :param to_set: List of dictionaries.
-    :param path: List.
-    :returns: Dict.
-    """
-    attrs = {}
-    for i, attr in enumerate(to_set):
-        key = attr.get("key", i)
-        value = attr.get("value", "")
-        if not value:
-            lookup = attr.get("value_lookup", "")
-            if lookup:
-                alias, lookup_key = lookup.split(".")
-                node = record[alias]
-                value = graph.node[node].get(lookup_key, "")
-        attrs[key] = value
-    return attrs
-
-
 def _neo4j_get_source_target(record, pattern):
     try:
         alias_seq = [(p["node"]["alias"], p["node"]["unique"])
@@ -186,18 +224,3 @@ def _neo4j_get_source_target(record, pattern):
     except KeyError:
         raise Exception("Invalid transformation pattern.")
     return source, target
-
-
-def _neo4j_lookup_attrs(to_set, record):
-    attrs = {}
-    for i, attr in enumerate(to_set):
-        key = attr.get("key", i)
-        value = attr.get("value", "")
-        if not value:
-            lookup = attr.get("value_lookup", "")
-            if lookup:
-                alias, lookup_key = lookup.split(".")
-                node = record[alias]
-                value = node[lookup_key]
-        attrs[key] = value
-    return attrs

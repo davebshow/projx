@@ -16,7 +16,7 @@ def execute_etl(etl, graph=None):
     """
     etl = ETL(etl)
     if graph is None:
-        graph = etl.extractor_json[etl.extractor_name].get("source", "")
+        graph = etl.extractor_json[etl.extractor_name].get("uri", "")
     # Extractor is a function that returns the data source and all necessary
     # info to open up a data stream.
     extractor = etl.extractor

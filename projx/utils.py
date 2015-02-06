@@ -260,7 +260,7 @@ neo4j2nx_etl = {
     "extractor": {
         "neo4j": {
             "query": "match (n)--(r:Recipe)--(m) return n, r, m",
-            "source": "http://localhost:7474/db/data/"
+            "uri": "http://localhost:7474/db/data/"
         }
 
     },
@@ -344,6 +344,95 @@ neo4j2edgelist_etl = {
         "neo4j2edgelist": {"delim": ",", "filename": "demo.csv", "newline": "\n"}
     }
 }
+
+
+edgelist2neo4j_etl = {
+    "extractor": {
+        "edgelist": {
+            "filename": "data/small.opsahl-collaboration",
+            "delim": " ",
+            "pattern": [
+                {"node": {"alias": "n"}},
+                {"edge": {}},
+                {"node": {"alias": "m"}}
+            ]
+        }
+    },
+    "transformers": [
+        #{
+        #    "node": {
+        #        "pattern": [{"node": {"alias": "n"}}],
+        #        "set": [{"key": "type", "value": "type1"}]
+        #    },
+        #},
+        #{
+        #    "node": {
+        #        "pattern": [{"node": {"alias": "m"}}],
+        #        "set": [{"key": "type", "value": "type2"}]
+        #    },
+        #},
+        {
+            "edge": {
+                "pattern": [
+                    {"node": {"alias": "n"}},
+                    {"edge": {}},
+                    {"node": {"alias": "m"}}
+                ],
+                "set": [
+                    {"key": "set", "value": "true"}
+                ],
+            }
+        }
+    ],
+    "loader": {
+        "edgelist2neo4j": {}
+    }
+}
+
+
+bigedgelist2neo4j_etl = {
+    "extractor": {
+        "edgelist": {
+            "filename": "data/opsahl-collaboration/out.opsahl-collaboration",
+            "delim": " ",
+            "pattern": [
+                {"node": {"alias": "n"}},
+                {"edge": {}},
+                {"node": {"alias": "m"}}
+            ]
+        }
+    },
+    "transformers": [
+        #{
+        #    "node": {
+        #        "pattern": [{"node": {"alias": "n"}}],
+        #        "set": [{"key": "type", "value": "type1"}]
+        #    },
+        #},
+        #{
+        #    "node": {
+        #        "pattern": [{"node": {"alias": "m"}}],
+        #        "set": [{"key": "type", "value": "type2"}]
+        #    },
+        #},
+        {
+            "edge": {
+                "pattern": [
+                    {"node": {"alias": "n"}},
+                    {"edge": {}},
+                    {"node": {"alias": "m"}}
+                ],
+                "set": [
+                    {"key": "set", "value": "true"}
+                ],
+            }
+        }
+    ],
+    "loader": {
+        "edgelist2neo4j": {}
+    }
+}
+
 
 
 def draw_simple_graph(graph, node_type_attr='type',

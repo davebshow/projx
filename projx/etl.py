@@ -4,7 +4,7 @@ ETL does initial validation on config JSON and provides the extractor function,
 stream function, list of transformers (JSON), the loader JSON, and graph object
 for the loader pipeline.
 """
-from modules import loaders, neo4j_xtrct, nx_xtrct
+from modules import loaders, neo4j_xtrct, nx_xtrct, edgelist_xtrct
 
 
 class ETL(object):
@@ -108,6 +108,15 @@ class ETL(object):
                 self.extractor_json[self.extractor_name], graph
             )
 
+        @self.extractors_wrapper("edgelist")
+        def get_edgelist_extractor(graph):
+            """
+            :returns: projx.nx_extractor
+            """
+            return edgelist_xtrct.edgelist_extractor(
+                self.extractor_json[self.extractor_name], graph
+            )
+
 
     def _get_streams(self):
         return self._streams
@@ -143,6 +152,14 @@ class ETL(object):
             :returns: projx.nx_extractor
             """
             return neo4j_xtrct.neo4j_stream(extractor_context, graph)
+
+        @self.streams_wrapper("edgelist")
+        def get_edgelist_stream(extractor_context, graph):
+            """
+            :param graph: networkx.Graph
+            :returns: projx.nx_extractor
+            """
+            return edgelist_xtrct.edgelist_stream(extractor_context, graph)
 
 
     def _get_loader(self):
@@ -193,6 +210,23 @@ class ETL(object):
             :returns: projx.nx_loader
             """
             return loaders.neo4j2edgelist_loader(
+                extractor,
+                stream,
+                transformers,
+                self.loader_json[self.loader_name],
+                graph
+            )
+
+
+        @self.loaders_wrapper("edgelist2neo4j")
+        def get_edgelist2neo4j_loader(extractor, stream, transformers, graph):
+            """
+            :param tranformers: List of dicts.
+            :extractor: function.
+            :param graph: networkx.Graph
+            :returns: projx.nx_loader
+            """
+            return loaders.edgelist2neo4j_loader(
                 extractor,
                 stream,
                 transformers,
