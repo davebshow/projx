@@ -359,33 +359,22 @@ edgelist2neo4j_etl = {
         }
     },
     "transformers": [
-        #{
-        #    "node": {
-        #        "pattern": [{"node": {"alias": "n"}}],
-        #        "set": [{"key": "type", "value": "type1"}]
-        #    },
-        #},
-        #{
-        #    "node": {
-        #        "pattern": [{"node": {"alias": "m"}}],
-        #        "set": [{"key": "type", "value": "type2"}]
-        #    },
-        #},
         {
             "edge": {
                 "pattern": [
-                    {"node": {"alias": "n"}},
-                    {"edge": {}},
-                    {"node": {"alias": "m"}}
-                ],
-                "set": [
-                    {"key": "set", "value": "true"}
-                ],
+                    {"node": {"alias": "n", "label": "Author"}},
+                    {"edge": {"label": "IN"}},
+                    {"node": {"alias": "m", "label": "Paper"}}
+                ]
             }
         }
     ],
     "loader": {
-        "edgelist2neo4j": {}
+        "edgelist2neo4j": {
+            "uri": "http://localhost:7474/db/data",
+            "stmt_per_req": 100,
+            "req_per_tx": 10
+        }
     }
 }
 

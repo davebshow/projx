@@ -17,7 +17,7 @@ def neo4j_extractor(extractor_json, graph):
 def neo4j_stream(transformers, extractor_json):
     graph = extractor_json["graph"]
     query = extractor_json["query"]
-    for record in graph.cypher.stream(query):
+    for record in graph.cypher.execute(query):
         for transformer in transformers:
             trans_kwrd = transformer.keys()[0]
             trans = transformer[trans_kwrd]

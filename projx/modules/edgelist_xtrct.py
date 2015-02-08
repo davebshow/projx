@@ -38,5 +38,5 @@ def _edgelist_value(to_set):
     for i, attr in enumerate(to_set):
         key = attr.get("key", i)
         value = attr.get("value", "")
-    attrs[key] = value
+        attrs[key] = value
     return attrs

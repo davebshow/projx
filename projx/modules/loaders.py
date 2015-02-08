@@ -135,7 +135,7 @@ def edgelist2neo4j_loader(extractor, stream, transformers, loader_json, graph):
     start = datetime.now()
     extractor_json = extractor(graph)
     uri = loader_json.get("uri", "http://localhost:7474/db/data")
-    stmt_per_req = loader_json.get("stmt_per_req", 500)
+    stmt_per_req = loader_json.get("stmt_per_req", 100)
     req_per_tx = loader_json.get("req_per_tx", 10)
     output_graph = Graph(uri)
     statements = 0
@@ -145,43 +145,38 @@ def edgelist2neo4j_loader(extractor, stream, transformers, loader_json, graph):
     for trans in stream(transformers, extractor_json):
         record, trans_kwrd, trans, attrs = trans
         pattern = trans.get("pattern", [])
-        if trans_kwrd == "node":
+        if trans_kwrd == "edge":
             try:
-                node = pattern[0].get("node", {})
-                alias = node.get("alias", "")
-            except (IndexError, KeyError):
-                raise Exception("Invalid transformation pattern.")
-            statement = "MERGE (n {UniqueId: {N}})"
-            tx.append(statement, {"N": record[alias]})
-            statements += 1
-        elif trans_kwrd == "edge":
-            try:
-                source, target = [p["node"]["alias"] for p in pattern[0::2]]
-                edge = pattern[1]["edge"].get("type", "IN")
+                source, target = [p["node"] for p in pattern[0::2]]
+                s_alias = source["alias"]
+                t_alias = target["alias"]
+                s_label = source.get("label", "N")
+                t_label = target.get("label", "N")
+                e_label = pattern[1]["edge"].get("label", "E")
             except (ValueError, KeyError):
                 raise Exception("Invalid pattern")
             statement = """
-                MERGE (n: A {UniqueId: {N}})
+                MERGE (n: %s {UniqueId: {N}})
                 WITH n
-                MERGE (m: B {UniqueId: {M}})
+                MERGE (m: %s {UniqueId: {M}})
                 WITH n, m
-                MERGE (n)-[:IN]-(m);"""
-            tx.append(statement, {"N": record[source], "M": record[target]})
+                MERGE (n)-[:%s]-(m);""" % (s_label, t_label, e_label)
+            tx.append(statement, {"N": record[s_alias], "M": record[t_alias]})
             statements += 1
         if statements == stmt_per_req:
             tx.process()
             edges += stmt_per_req
             requests += 1
-            print("Processed {0} statements".format(stmt_per_req))
-            current = datetime.now() - start
-            print("Total edges processed: {0} in {1}".format(edges, current))
+            #print("Processed {0} statements".format(stmt_per_req))
+            #current = datetime.now() - start
+            #print("Total edges processed: {0} in {1}".format(edges, current))
             statements = 0
             if requests == req_per_tx:
                 tx.commit()
                 tx = output_graph.cypher.begin()
-                print("Commited {0} requests of {1} statements".format(
-                    req_per_tx, stmt_per_req
-                ))
+                #print("Commited {0} requests of {1} statements".format(
+                #    req_per_tx, stmt_per_req
+                #))
                 requests = 0
     if not tx.finished:
         tx.commit()
