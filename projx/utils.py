@@ -383,51 +383,6 @@ edgelist2neo4j_etl = {
 }
 
 
-bigedgelist2neo4j_etl = {
-    "extractor": {
-        "edgelist": {
-            "filename": "data/opsahl-collaboration/out.opsahl-collaboration",
-            "delim": " ",
-            "pattern": [
-                {"node": {"alias": "n"}},
-                {"edge": {}},
-                {"node": {"alias": "m"}}
-            ]
-        }
-    },
-    "transformers": [
-        #{
-        #    "node": {
-        #        "pattern": [{"node": {"alias": "n"}}],
-        #        "set": [{"key": "type", "value": "type1"}]
-        #    },
-        #},
-        #{
-        #    "node": {
-        #        "pattern": [{"node": {"alias": "m"}}],
-        #        "set": [{"key": "type", "value": "type2"}]
-        #    },
-        #},
-        {
-            "edge": {
-                "pattern": [
-                    {"node": {"alias": "n"}},
-                    {"edge": {}},
-                    {"node": {"alias": "m"}}
-                ],
-                "set": [
-                    {"key": "set", "value": "true"}
-                ],
-            }
-        }
-    ],
-    "loader": {
-        "edgelist2neo4j": {}
-    }
-}
-
-
-
 def draw_simple_graph(graph, node_type_attr='type',
                       edge_label_attr='weight', show_edge_labels=True,
                       label_attrs=['label']):
