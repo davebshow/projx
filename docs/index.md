@@ -20,7 +20,7 @@ Demo Notebook with [projx DSL](http://bit.ly/1EiMaMt)
 
 Demo Notebook with [Neo4j2NetworkX](http://nbviewer.ipython.org/github/davebshow/projx/blob/master/projx_neo4j_demo.ipynb)
 
-Demo Notebook: [Loading the Flickr group graph to Neo4j](http://nbviewer.ipython.org/github/davebshow/projx/blob/master/flicker_graph.ipynb)**
+Demo Notebook: [Loading the Flickr group graph to Neo4j](http://nbviewer.ipython.org/github/davebshow/projx/blob/master/flicker_graph.ipynb)
 
 
 Thanks to [@versae](https://github.com/versae) for inspiring this project.
