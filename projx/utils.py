@@ -349,7 +349,7 @@ neo4j2edgelist_etl = {
 edgelist2neo4j_etl = {
     "extractor": {
         "edgelist": {
-            "filename": "data/small.opsahl-collaboration",
+            "filename": "data/flickr-groupmemberships/out.flickr-groupmemberships",
             "delim": " ",
             "pattern": [
                 {"node": {"alias": "n"}},
@@ -362,9 +362,9 @@ edgelist2neo4j_etl = {
         {
             "edge": {
                 "pattern": [
-                    {"node": {"alias": "n", "label": "Author"}},
+                    {"node": {"alias": "n", "label": "User"}},
                     {"edge": {"label": "IN"}},
-                    {"node": {"alias": "m", "label": "Paper"}}
+                    {"node": {"alias": "m", "label": "Group"}}
                 ]
             }
         }
@@ -372,8 +372,12 @@ edgelist2neo4j_etl = {
     "loader": {
         "edgelist2neo4j": {
             "uri": "http://localhost:7474/db/data",
-            "stmt_per_req": 100,
-            "req_per_tx": 10
+            "stmt_per_req": 500,
+            "req_per_tx": 25,
+            "indicies": [
+                {"label": "User", "attr": "UniqueId"},
+                {"label": "Group", "attr": "UniqueId"}
+            ]
         }
     }
 }

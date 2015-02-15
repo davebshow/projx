@@ -136,11 +136,21 @@ def edgelist2neo4j_loader(extractor, stream, transformers, loader_json, graph):
     extractor_json = extractor(graph)
     uri = loader_json.get("uri", "http://localhost:7474/db/data")
     stmt_per_req = loader_json.get("stmt_per_req", 100)
+    print("Statements per request: {0}".format(stmt_per_req))
     req_per_tx = loader_json.get("req_per_tx", 10)
+    print("Requests per transactions: {0}".format(req_per_tx))
     output_graph = Graph(uri)
     statements = 0
     requests = 0
     edges = 0
+    indicies = loader_json.get("indicies", [])
+    for ndx in indicies:
+        try:
+            ndx = "CREATE INDEX ON :{0}({1});".format(ndx["label"], ndx["attr"])
+            output_graph.cypher.execute(ndx)
+            print("Created index: {0}".format(ndx))
+        except:
+            raise Exception("Invalid index")
     tx = output_graph.cypher.begin()
     for trans in stream(transformers, extractor_json):
         record, trans_kwrd, trans, attrs = trans
@@ -167,21 +177,18 @@ def edgelist2neo4j_loader(extractor, stream, transformers, loader_json, graph):
             tx.process()
             edges += stmt_per_req
             requests += 1
-            #print("Processed {0} statements".format(stmt_per_req))
-            #current = datetime.now() - start
-            #print("Total edges processed: {0} in {1}".format(edges, current))
+            current = datetime.now() - start
+            if not edges % 1000000:
+                print("Merged {0} edges in {1}".format(edges, current))
             statements = 0
             if requests == req_per_tx:
                 tx.commit()
                 tx = output_graph.cypher.begin()
-                #print("Commited {0} requests of {1} statements".format(
-                #    req_per_tx, stmt_per_req
-                #))
                 requests = 0
     if not tx.finished:
         tx.commit()
     finish = datetime.now()
-    print("Load complete: {0} edges in {1}".format(edges, finish - start))
+    print("Load complete: merged {0} edges in {1}".format(edges, finish - start))
 
 
 
